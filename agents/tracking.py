@@ -13,7 +13,6 @@ Detects:
 """
 
 import time
-import random
 from typing import Any
 from copy import deepcopy
 from agents.base import BaseAgent
@@ -28,8 +27,6 @@ class TrackingAgent(BaseAgent):
             icon="📊",
             description="Simulates Day 1→Day 3 progression, detects delays, overdue tasks, and bottlenecks",
         )
-        # Fixed seed for deterministic demo behavior
-        self._rng = random.Random(42)
 
     def process(self, input_data: Any, context: dict) -> dict:
         tasks = deepcopy(input_data["tasks"])
@@ -44,6 +41,13 @@ class TrackingAgent(BaseAgent):
         )
         self.add_log(f"📊 Simulating Day {day} progress for {len(tasks)} tasks...")
         time.sleep(0.3)
+
+        # Ensure all tasks have required fields initialized
+        for task in tasks:
+            if "progress" not in task:
+                task["progress"] = 0
+            if "status" not in task:
+                task["status"] = "pending"
 
         # Apply simulation for each day up to the requested day
         day_snapshots = {}
@@ -72,12 +76,14 @@ class TrackingAgent(BaseAgent):
         self.add_log(f"   🚫 Blocked: {blocked}")
         self.add_log(f"   🚨 Issues Detected: {len(issues)}")
 
+        velocity = "on track" if delayed == 0 else "at risk" if delayed <= 2 else "critical"
+
         logger.log(
             self.name,
             f"Day {day} simulation complete — {completed} done, {delayed} delayed, {len(issues)} issues",
             f"Progress: {completed}/{len(current_tasks)} tasks completed. "
-            f"{delayed} tasks are delayed. {len(issues)} issues require attention. "
-            f"Velocity: {'on track' if delayed == 0 else 'at risk' if delayed <= 2 else 'critical'}.",
+            f"{delayed} tasks are delayed. {len(issues)} issues require autonomous action. "
+            f"Velocity: {velocity}. Routing to Decision Agent for corrective actions.",
         )
 
         return {
@@ -96,14 +102,14 @@ class TrackingAgent(BaseAgent):
         }
 
     def _simulate_day(self, tasks: list, day: int, logger) -> list:
-        """Simulate progress for a single day."""
-        self._rng = random.Random(42 + day)  # Deterministic per day
-
-        for task in tasks:
+        """Simulate progress for a single day — fully deterministic."""
+        # Use a deterministic mapping based on task index and day
+        for idx, task in enumerate(tasks):
             prev_status = task["status"]
-            task = self._update_task_for_day(task, day)
+            prev_progress = task.get("progress", 0)
+            task = self._update_task_for_day(task, day, idx)
 
-            if task["status"] != prev_status:
+            if task["status"] != prev_status or task.get("progress", 0) != prev_progress:
                 status_icon = {
                     "completed": "✅",
                     "in-progress": "🔄",
@@ -112,9 +118,13 @@ class TrackingAgent(BaseAgent):
                     "pending": "⏳",
                 }.get(task["status"], "📋")
 
+                title_short = task['title'][:35]
+                if len(task['title']) > 35:
+                    title_short += "..."
+
                 self.add_log(
-                    f"  {status_icon} Day {day}: {task['id']} ({task['title'][:35]}...) "
-                    f"→ {task['status'].upper()}"
+                    f"  {status_icon} Day {day}: {task['id']} ({title_short}) "
+                    f"→ {task['status'].upper()} [{task.get('progress', 0)}%]"
                 )
 
                 if task["status"] in ("delayed", "blocked"):
@@ -123,14 +133,15 @@ class TrackingAgent(BaseAgent):
                         f"Day {day}: {task['id']} is now {task['status'].upper()}",
                         f"Task '{task['title'][:50]}' owned by {task['owner']} "
                         f"has moved to {task['status']} status. "
-                        f"Priority: {task['priority']}. Due: {task['deadline']}.",
+                        f"Priority: {task['priority']}. Due: {task['deadline']}. "
+                        f"Reason: {task.get('delay_reason', 'Unknown')}",
                         severity="WARNING",
                     )
 
         return tasks
 
-    def _update_task_for_day(self, task: dict, day: int) -> dict:
-        """Deterministic task state update based on properties."""
+    def _update_task_for_day(self, task: dict, day: int, task_idx: int = 0) -> dict:
+        """Deterministic task state update based on properties and task index."""
         priority = task["priority"]
         risk = task["risk_flag"]
         owner = task["owner"]
@@ -139,6 +150,7 @@ class TrackingAgent(BaseAgent):
 
         # Already completed tasks stay completed
         if status == "completed":
+            task["progress"] = 100
             return task
 
         # Unassigned tasks never progress
@@ -146,44 +158,46 @@ class TrackingAgent(BaseAgent):
             if day >= 2:
                 task["status"] = "delayed"
                 task["delay_reason"] = "No owner assigned — task cannot progress"
+                task["progress"] = 0
             return task
 
-        # Day 1 simulation
+        # Use task_idx as a deterministic offset (0-based)
+        # odd-indexed tasks slightly behind, even-indexed slightly ahead
+        idx_factor = task_idx % 2  # 0 or 1
+
+        # ── DAY 1 ──────────────────────────────────
         if day == 1:
             if priority == "P0":
-                # P0 tasks start immediately
-                if risk != "HIGH":
-                    task["status"] = "in-progress"
-                    task["progress"] = 40
-                else:
+                task["status"] = "in-progress"
+                task["progress"] = 35 if risk == "HIGH" else (45 - idx_factor * 5)
+            elif priority == "P1":
+                # All P1s start on Day 1 (deterministic)
+                if idx_factor == 0:
                     task["status"] = "in-progress"
                     task["progress"] = 20
-            elif priority == "P1":
-                # P1 tasks may start
-                if self._rng.random() > 0.4:
+                else:
                     task["status"] = "in-progress"
                     task["progress"] = 15
             # P2 tasks stay pending on Day 1
 
-        # Day 2 simulation
+        # ── DAY 2 ──────────────────────────────────
         elif day == 2:
             if priority == "P0":
                 if risk == "HIGH":
-                    # High risk P0 tasks get delayed
                     task["status"] = "delayed"
                     task["delay_reason"] = "High risk factors slowing progress"
-                    task["progress"] = 35
+                    task["progress"] = 40
                 elif deadline == "Day 1":
-                    # Overdue P0 task
                     task["status"] = "delayed"
                     task["delay_reason"] = "Missed Day 1 deadline"
                     task["progress"] = 60
                 else:
                     task["status"] = "in-progress"
-                    task["progress"] = 75
+                    task["progress"] = 75 - idx_factor * 10
             elif priority == "P1":
                 if status == "in-progress":
-                    if self._rng.random() > 0.3:
+                    # Deterministic: even tasks progress, odd tasks get delayed
+                    if idx_factor == 0:
                         task["status"] = "in-progress"
                         task["progress"] = 55
                     else:
@@ -194,43 +208,43 @@ class TrackingAgent(BaseAgent):
                     task["status"] = "in-progress"
                     task["progress"] = 20
             elif priority == "P2":
-                if self._rng.random() > 0.5:
+                if idx_factor == 0:
                     task["status"] = "in-progress"
                     task["progress"] = 10
 
-        # Day 3 simulation
+        # ── DAY 3 ──────────────────────────────────
         elif day == 3:
             if priority == "P0":
                 if status == "delayed":
-                    task["progress"] = min(task.get("progress", 50) + 20, 70)
-                    # Still delayed but progressing
+                    task["progress"] = min(task.get("progress", 50) + 20, 75)
+                    # Still delayed but progressing toward resolution
                 else:
                     task["status"] = "completed"
                     task["progress"] = 100
             elif priority == "P1":
                 if status == "delayed":
-                    task["progress"] = min(task.get("progress", 30) + 15, 60)
+                    task["progress"] = min(task.get("progress", 30) + 15, 65)
                 elif status == "in-progress":
                     if task.get("progress", 0) >= 50:
                         task["status"] = "completed"
                         task["progress"] = 100
                     else:
-                        task["progress"] = min(task.get("progress", 0) + 30, 80)
+                        task["progress"] = min(task.get("progress", 0) + 30, 85)
                 else:
                     task["status"] = "in-progress"
                     task["progress"] = 25
             elif priority == "P2":
                 if status == "in-progress":
-                    task["progress"] = min(task.get("progress", 0) + 20, 50)
-                elif deadline == "Day 3":
+                    task["progress"] = min(task.get("progress", 0) + 25, 55)
+                elif deadline == "Day 3" and status == "pending":
                     task["status"] = "delayed"
-                    task["delay_reason"] = "Day 3 deadline approaching, not started"
+                    task["delay_reason"] = "Day 3 deadline reached, task not started"
                     task["progress"] = 0
 
         # Blocked task check (if has unmet dependencies)
-        if task.get("dependencies"):
+        if task.get("dependencies") and status != "completed":
             task["status"] = "blocked"
-            task["delay_reason"] = f"Blocked by dependencies: {', '.join(task['dependencies'])}"
+            task["delay_reason"] = f"Blocked by: {', '.join(task['dependencies'])}"
 
         return task
 
@@ -239,8 +253,13 @@ class TrackingAgent(BaseAgent):
         issues = []
 
         for task in tasks:
+            deadline_str = task.get("deadline", "Day 3")
+            try:
+                deadline_day = int(deadline_str.replace("Day ", "").strip())
+            except (ValueError, AttributeError):
+                deadline_day = 3
+
             # Overdue tasks
-            deadline_day = int(task["deadline"].replace("Day ", "")) if "Day" in task.get("deadline", "") else 3
             if day >= deadline_day and task["status"] not in ("completed",):
                 issue = {
                     "type": "overdue",
@@ -256,7 +275,8 @@ class TrackingAgent(BaseAgent):
                     self.name,
                     f"⏰ OVERDUE: {task['id']} was due {task['deadline']}, now Day {day}",
                     f"Task '{task['title'][:50]}' owned by {task['owner']} is overdue. "
-                    f"Priority: {task['priority']}. Current status: {task['status']}.",
+                    f"Priority: {task['priority']}. Current status: {task['status']}. "
+                    f"Progress: {task.get('progress', 0)}%.",
                     severity="WARNING",
                 )
 
@@ -267,12 +287,13 @@ class TrackingAgent(BaseAgent):
                     "task_id": task["id"],
                     "task_title": task["title"],
                     "priority": task["priority"],
+                    "owner": "UNASSIGNED",
                     "detail": f"Still unassigned on Day {day}",
                     "severity": "HIGH",
                 }
                 issues.append(issue)
 
-            # Stalled tasks (in-progress but low progress)
+            # Stalled tasks (in-progress but very low progress on Day 2+)
             if task["status"] == "in-progress" and task.get("progress", 0) < 20 and day >= 2:
                 issue = {
                     "type": "stalled",
@@ -291,7 +312,7 @@ class TrackingAgent(BaseAgent):
                     "type": "delayed",
                     "task_id": task["id"],
                     "task_title": task["title"],
-                    "owner": task["owner"],
+                    "owner": task.get("owner", "UNASSIGNED"),
                     "priority": task["priority"],
                     "detail": task.get("delay_reason", "Unknown delay"),
                     "severity": "HIGH" if task["priority"] == "P0" else "MEDIUM",

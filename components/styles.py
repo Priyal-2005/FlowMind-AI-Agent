@@ -78,15 +78,77 @@ def get_main_styles() -> str:
         letter-spacing: 0.03em;
     }
 
-    .main-header .mode-badge {
+    /* ── MODE BADGE (global scope) ──────────────── */
+    .mode-badge {
         display: inline-block;
-        margin-top: 0.5rem;
         padding: 0.25rem 0.75rem;
         background: rgba(108, 99, 255, 0.15);
         border: 1px solid rgba(108, 99, 255, 0.3);
         border-radius: 20px;
         color: #6C63FF;
         font-size: 0.75rem;
+        font-weight: 500;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── SUMMARY BANNER ──────────────────────────── */
+    .summary-banner {
+        background: linear-gradient(135deg, rgba(0, 212, 170, 0.08), rgba(108, 99, 255, 0.08));
+        border: 1px solid rgba(0, 212, 170, 0.2);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 0 40px rgba(0, 212, 170, 0.05);
+        animation: fade-in 0.6s ease-out;
+    }
+
+    .summary-banner-inner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+    }
+
+    .summary-stat {
+        flex: 1;
+        text-align: center;
+        padding: 0.5rem;
+    }
+
+    .summary-stat-icon {
+        font-size: 1.3rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .summary-stat-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #FAFAFA;
+        font-family: 'Inter', sans-serif;
+        line-height: 1;
+        margin: 0.2rem 0;
+    }
+
+    .summary-stat-label {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 500;
+    }
+
+    .summary-divider {
+        width: 1px;
+        height: 50px;
+        background: var(--border-subtle);
+        flex-shrink: 0;
+    }
+
+    .summary-banner-label {
+        text-align: center;
+        margin-top: 0.75rem;
+        font-size: 0.75rem;
+        color: var(--accent-primary);
         font-weight: 500;
         font-family: 'JetBrains Mono', monospace;
     }
@@ -131,6 +193,7 @@ def get_main_styles() -> str:
     .metric-tile:hover {
         transform: translateY(-2px);
         border-color: var(--border-glow);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     }
 
     .metric-value {
@@ -315,6 +378,18 @@ def get_main_styles() -> str:
         transform: translateX(2px);
     }
 
+    .task-table tbody tr.row-delayed {
+        background: rgba(255, 184, 0, 0.04);
+    }
+
+    .task-table tbody tr.row-blocked {
+        background: rgba(255, 75, 75, 0.04);
+    }
+
+    .task-table tbody tr.row-completed {
+        background: rgba(0, 212, 170, 0.03);
+    }
+
     .task-table tbody td {
         padding: 0.6rem 0.75rem;
         font-size: 0.8rem;
@@ -392,33 +467,94 @@ def get_main_styles() -> str:
         background: var(--bg-card);
         border: 1px solid var(--border-subtle);
         border-radius: var(--radius-md);
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
+        padding: 0.85rem 1rem;
+        margin-bottom: 0.6rem;
         transition: all 0.2s ease;
     }
 
     .action-card:hover {
         border-color: var(--border-glow);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        transform: translateX(2px);
     }
 
-    .action-card .action-type {
+    .action-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.35rem;
+    }
+
+    .action-type-badge {
         font-size: 0.65rem;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.06em;
+        color: var(--accent-primary);
+    }
+
+    .action-task-id {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.65rem;
+        color: var(--accent-secondary);
+        background: rgba(108, 99, 255, 0.1);
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+    }
+
+    .action-title {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-primary);
         margin-bottom: 0.25rem;
     }
 
-    .action-card .action-detail {
-        font-size: 0.8rem;
+    .action-detail {
+        font-size: 0.78rem;
         color: var(--text-primary);
         margin-bottom: 0.2rem;
     }
 
-    .action-card .action-reasoning {
+    .action-reasoning {
         font-size: 0.7rem;
         color: var(--text-secondary);
         font-style: italic;
+        line-height: 1.4;
+    }
+
+    .owner-change {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin: 0.2rem 0;
+        font-size: 0.75rem;
+    }
+
+    .owner-from {
+        background: rgba(255, 75, 75, 0.1);
+        color: #FF4B4B;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        text-decoration: line-through;
+    }
+
+    .owner-to {
+        background: rgba(0, 212, 170, 0.1);
+        color: #00D4AA;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+    }
+
+    .escalation-badge {
+        display: inline-block;
+        margin-top: 0.3rem;
+        font-size: 0.65rem;
+        color: #FF4B4B;
+        font-weight: 600;
+        font-family: 'JetBrains Mono', monospace;
     }
 
     .escalation-card {
@@ -433,36 +569,48 @@ def get_main_styles() -> str:
         border-left: 3px solid var(--accent-primary);
     }
 
-    /* ── DAY SELECTOR ────────────────────────────── */
-    .day-selector {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: center;
-        padding: 0.75rem 0;
-    }
-
-    .day-btn {
-        padding: 0.5rem 1.5rem;
-        border-radius: var(--radius-md);
-        border: 1px solid var(--border-subtle);
+    /* ── ACTION STAT CARDS ──────────────────────── */
+    .action-stat-card {
         background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        padding: 0.75rem;
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .action-stat-value {
+        font-size: 1.8rem;
+        font-weight: 800;
+        font-family: 'Inter', sans-serif;
+        line-height: 1;
+    }
+
+    .action-stat-label {
+        font-size: 0.7rem;
         color: var(--text-secondary);
-        font-weight: 600;
-        font-size: 0.85rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
+        margin-top: 0.2rem;
+        font-weight: 500;
     }
 
-    .day-btn:hover {
-        border-color: var(--accent-secondary);
-        color: var(--text-primary);
+    .action-stat-blue .action-stat-value { color: #45B7D1; }
+    .action-stat-red .action-stat-value { color: #FF4B4B; }
+    .action-stat-yellow .action-stat-value { color: #FFB800; }
+
+    /* ── DAY SELECTOR ────────────────────────────── */
+    .day-description {
+        margin-top: 0.6rem;
+        padding: 0.6rem 0.9rem;
+        border-left: 3px solid var(--accent-primary);
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
     }
 
-    .day-btn.active {
-        background: linear-gradient(135deg, rgba(108, 99, 255, 0.2), rgba(0, 212, 170, 0.2));
-        border-color: var(--accent-secondary);
+    .day-description b {
         color: var(--text-primary);
-        box-shadow: 0 0 15px rgba(108, 99, 255, 0.15);
     }
 
     /* ── SECTION HEADERS ─────────────────────────── */
@@ -630,5 +778,9 @@ def get_main_styles() -> str:
     .progress-blue { background: linear-gradient(90deg, #45B7D1, #6C63FF); }
     .progress-yellow { background: linear-gradient(90deg, #FFB800, #FF9500); }
     .progress-red { background: linear-gradient(90deg, #FF4B4B, #FF6B6B); }
+    
+    /* ── HIDE DEFAULT STREAMLIT STUFF ─────────────── */
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
 </style>
 """

@@ -20,6 +20,7 @@ from components.dashboard import (
     render_day_simulation,
     render_actions_panel,
     render_risk_chart,
+    render_summary_banner,
 )
 from components.audit import render_audit_trail
 
@@ -44,8 +45,6 @@ if "current_day" not in st.session_state:
 if "selected_transcript" not in st.session_state:
     st.session_state.selected_transcript = get_transcript_names()[0]
 
-orch = st.session_state.orchestrator
-
 
 # ── SIDEBAR ──────────────────────────────────────────
 with st.sidebar:
@@ -65,6 +64,7 @@ with st.sidebar:
     st.markdown("---")
 
     # LLM Mode indicator
+    orch = st.session_state.orchestrator
     st.markdown(f"""
     <div style="text-align: center; margin-bottom: 1rem;">
         <span class="mode-badge">{orch.llm.mode}</span>
@@ -96,6 +96,16 @@ with st.sidebar:
 
     st.markdown("---")
 
+    # Demo Mode button
+    st.markdown("### 🎬 Demo Mode")
+    demo_clicked = st.button(
+        "⚡ Auto Demo (Crisis Response)",
+        use_container_width=True,
+        type="secondary",
+        key="demo_mode",
+        help="Loads the Crisis Response transcript and runs the pipeline automatically",
+    )
+
     # Run button
     run_clicked = st.button(
         "🚀 Run Autonomous Workflow",
@@ -104,13 +114,19 @@ with st.sidebar:
         key="run_pipeline",
     )
 
-    if run_clicked:
-        st.session_state.pipeline_ran = False
-        st.session_state.current_day = 1
-        # Reset orchestrator
-        orch.reset()
-        st.session_state.orchestrator = MeetingOrchestrator()
-        orch = st.session_state.orchestrator
+    if demo_clicked:
+        # Switch to crisis transcript
+        crisis_name = "Crisis Response — Missing Owners"
+        if crisis_name in TRANSCRIPTS:
+            st.session_state.selected_transcript = crisis_name
+            # Flag that we should auto-run
+            st.session_state.auto_run = True
+            st.rerun()
+
+    if run_clicked or st.session_state.get("auto_run", False):
+        if st.session_state.get("auto_run"):
+            st.session_state.auto_run = False
+            run_clicked = True
 
     # Architecture info
     st.markdown("---")
@@ -159,30 +175,32 @@ st.markdown("""
 
 # ── RUN PIPELINE ─────────────────────────────────────
 if run_clicked and transcript_text.strip():
-    with st.spinner(""):
-        # Create progress container
-        progress_placeholder = st.empty()
-        pipeline_placeholder = st.empty()
+    # Reset state
+    st.session_state.pipeline_ran = False
+    st.session_state.current_day = 1
+    new_orch = MeetingOrchestrator()
+    st.session_state.orchestrator = new_orch
 
+    with st.spinner(""):
         stages = [
             ("🔍 Extraction Agent — Parsing transcript...", 0.17),
             ("🧠 Intelligence Agent — Analyzing risks...", 0.34),
             ("⚡ Execution Agent — Creating tasks...", 0.51),
             ("📊 Tracking Agent — Simulating Day 1...", 0.68),
-            ("🤖 Decision Agent — Taking actions...", 0.85),
-            ("✅ Pipeline complete!", 1.0),
+            ("🤖 Decision Agent — Taking autonomous actions...", 0.85),
+            ("✅ Pipeline complete — All agents succeeded!", 1.0),
         ]
 
-        # Show progress bar
         progress_bar = st.progress(0, text="🎯 Orchestrator initializing pipeline...")
 
         import time
         for stage_text, stage_progress in stages:
             progress_bar.progress(stage_progress, text=stage_text)
-            time.sleep(0.3)
+            time.sleep(0.35)
 
         # Actually run the pipeline
-        result = orch.run_pipeline(transcript_text.strip())
+        result = st.session_state.orchestrator.run_pipeline(transcript_text.strip())
+
         st.session_state.pipeline_ran = True
         st.session_state.current_day = 1
 
@@ -193,31 +211,58 @@ if run_clicked and transcript_text.strip():
     st.rerun()
 
 
+# ── READ ORCH FROM SESSION ALWAYS ────────────────────
+orch = st.session_state.orchestrator
+
+
 # ── DISPLAY RESULTS ──────────────────────────────────
 if st.session_state.pipeline_ran and orch.state.get("pipeline_status") in ("complete", "error"):
     state = orch.state
 
-    # Agent Pipeline Visualization
+    # ── SUMMARY BANNER ──────────────────────────────
+    tasks = state.get("tasks", [])
+    decision = state.get("decision", {})
+    tracking = state.get("tracking", {})
+    issues = tracking.get("issues", [])
+    actions = decision.get("actions_taken", []) if decision else []
+    escalations = decision.get("escalations", []) if decision else []
+    reminders = decision.get("reminders", []) if decision else []
+
+    render_summary_banner(
+        total_tasks=len(tasks),
+        issues_detected=len(issues),
+        actions_taken=len(actions) + len(escalations) + len(reminders),
+        llm_mode=orch.llm.mode,
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── PIPELINE VISUALIZATION ───────────────────────
     render_pipeline(orch.agent_list, state.get("current_agent"))
     render_agent_logs(orch.agent_list)
 
     st.markdown("---")
 
-    # Time Simulation
+    # ── TIME SIMULATION ──────────────────────────────
     new_day = render_day_simulation(st.session_state.current_day)
     if new_day != st.session_state.current_day:
         st.session_state.current_day = new_day
         orch.simulate_day(new_day)
+        # Persist the updated orchestrator
+        st.session_state.orchestrator = orch
         st.rerun()
 
     st.markdown("---")
 
-    # Get current stats
+    # ── RELOAD STATE AFTER DAY CHANGE ────────────────
+    state = orch.state
+    tasks = state.get("tasks", [])
     tracking = state.get("tracking", {})
+    decision = state.get("decision", {})
+
+    # Compute stats from tracking or derive from tasks
     stats = tracking.get("stats", {})
     if not stats:
-        # Compute from tasks
-        tasks = state.get("tasks", [])
         stats = {
             "total": len(tasks),
             "completed": sum(1 for t in tasks if t.get("status") == "completed"),
@@ -227,12 +272,12 @@ if st.session_state.pipeline_ran and orch.state.get("pipeline_status") in ("comp
             "blocked": sum(1 for t in tasks if t.get("status") == "blocked"),
         }
 
-    # Metrics
+    # ── METRICS ─────────────────────────────────────
     render_metrics(stats, st.session_state.current_day)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Main content area — Task Table + Charts
+    # ── TABBED CONTENT ───────────────────────────────
     tab_tasks, tab_charts, tab_actions, tab_audit = st.tabs([
         "📋 Task Registry",
         "📊 Analytics",
@@ -253,7 +298,7 @@ if st.session_state.pipeline_ran and orch.state.get("pipeline_status") in ("comp
         render_audit_trail(orch.audit_logger)
 
 else:
-    # Welcome state — show instructions
+    # ── WELCOME STATE ────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -300,3 +345,29 @@ else:
                 <div style="color: #8B8FA3; font-size: 0.75rem; line-height: 1.4;">{desc}</div>
             </div>
             ''', unsafe_allow_html=True)
+
+    # Demo flow section
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><span class="header-icon">🎬</span> Demo Flow</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="glass-card" style="padding: 1.5rem;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+            <div style="text-align: center; padding: 0.75rem; background: rgba(0,212,170,0.05); border-radius: 10px; border: 1px solid rgba(0,212,170,0.15);">
+                <div style="font-size: 1.5rem;">1️⃣</div>
+                <div style="font-weight: 600; color: #FAFAFA; margin: 0.3rem 0; font-size: 0.85rem;">Select Transcript</div>
+                <div style="color: #8B8FA3; font-size: 0.72rem;">Choose from 3 realistic enterprise meeting scenarios — Sprint, Q4 Review, or Crisis Response</div>
+            </div>
+            <div style="text-align: center; padding: 0.75rem; background: rgba(108,99,255,0.05); border-radius: 10px; border: 1px solid rgba(108,99,255,0.15);">
+                <div style="font-size: 1.5rem;">2️⃣</div>
+                <div style="font-weight: 600; color: #FAFAFA; margin: 0.3rem 0; font-size: 0.85rem;">Run Pipeline</div>
+                <div style="color: #8B8FA3; font-size: 0.72rem;">Watch 5 AI agents execute sequentially — extract, analyze, task, track, and decide</div>
+            </div>
+            <div style="text-align: center; padding: 0.75rem; background: rgba(240,147,251,0.05); border-radius: 10px; border: 1px solid rgba(240,147,251,0.15);">
+                <div style="font-size: 1.5rem;">3️⃣</div>
+                <div style="font-weight: 600; color: #FAFAFA; margin: 0.3rem 0; font-size: 0.85rem;">Simulate Days</div>
+                <div style="color: #8B8FA3; font-size: 0.72rem;">Switch between Day 1→3 to see how tasks evolve, delays emerge, and the system auto-responds</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)

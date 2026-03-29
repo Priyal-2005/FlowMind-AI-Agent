@@ -144,7 +144,13 @@ class MeetingOrchestrator:
                 },
                 ctx,
             )
-            self.state["tasks"] = self.state["execution"]["tasks"]
+            # Safe read: execution result may be None or missing "tasks" if the agent
+            # failed/returned partial data. Fall back to the existing task list.
+            self.state["tasks"] = (
+                self.state["execution"].get("tasks")
+                if isinstance(self.state.get("execution"), dict)
+                else None
+            ) or self.state["tasks"]
 
             # Step 4: Tracking (Day 1 by default)
             self.state["current_agent"] = "tracking"
@@ -157,7 +163,13 @@ class MeetingOrchestrator:
                 {"tasks": self.state["tasks"], "day": 1},
                 ctx,
             )
-            self.state["tasks"] = self.state["tracking"]["tasks"]
+            # Safe read: tracking result may be None or missing "tasks".
+            # Fall back to the task list produced by the execution agent.
+            self.state["tasks"] = (
+                self.state["tracking"].get("tasks")
+                if isinstance(self.state.get("tracking"), dict)
+                else None
+            ) or self.state["tasks"]
             self.state["current_day"] = 1
 
             # Step 5: Decision
@@ -176,7 +188,17 @@ class MeetingOrchestrator:
                 },
                 ctx,
             )
-            self.state["tasks"] = self.state["decision"]["tasks"]
+            # Safe read (three-level fallback):
+            #   1. decision["tasks"]   — preferred: decision agent applied corrections
+            #   2. tracking["tasks"]   — fallback: pre-decision task state
+            #   3. state["tasks"]      — last resort: whatever we had before this step
+            decision_result = self.state.get("decision")
+            tracking_result = self.state.get("tracking")
+            self.state["tasks"] = (
+                (decision_result.get("tasks") if isinstance(decision_result, dict) else None)
+                or (tracking_result.get("tasks") if isinstance(tracking_result, dict) else None)
+                or self.state["tasks"]
+            )
 
             # Complete
             self.state["pipeline_status"] = "complete"
@@ -187,7 +209,7 @@ class MeetingOrchestrator:
                 "Pipeline complete — All agents executed successfully",
                 f"Processed {len(self.state['tasks'])} tasks. "
                 f"Day 1 simulation complete. "
-                f"{len(self.state['decision'].get('actions_taken', []))} autonomous actions taken. "
+                f"{len((self.state.get('decision') or {}).get('actions_taken', []))} autonomous actions taken. "
                 f"System ready for time simulation.",
             )
 
@@ -203,14 +225,27 @@ class MeetingOrchestrator:
         return self.state
 
     def simulate_day(self, day: int) -> dict:
-        """Run time simulation for a specific day."""
-        if not self.state.get("execution"):
+        """Run time simulation for a specific day.
+
+        Safe by design: never assumes that any prior agent result exists or
+        contains the expected keys. Falls back gracefully at every step so
+        the app never crashes when the user jumps between days or triggers
+        simulation before the full pipeline has finished.
+        """
+        # Guard: pipeline must have at least produced an execution result
+        # (tasks to re-simulate). Without it there is nothing to work with.
+        execution_result = self.state.get("execution")
+        if not isinstance(execution_result, dict):
+            # Pipeline hasn't run far enough — return current state unchanged.
             return self.state
 
         ctx = self.get_context()
 
-        # Get original tasks from execution (pre-tracking)
-        original_tasks = deepcopy(self.state["execution"]["tasks"])
+        # Safely pull the baseline task list produced by the execution agent.
+        # Fall back to the current state tasks if the key is absent.
+        original_tasks = deepcopy(
+            execution_result.get("tasks") or self.state.get("tasks") or []
+        )
 
         self.audit_logger.log(
             "Orchestrator",
@@ -218,38 +253,66 @@ class MeetingOrchestrator:
             f"Re-running tracking and decision agents for Day {day} scenario.",
         )
 
-        # Reset tracking and decision agents
+        # Reset tracking and decision agents for a clean simulation run
         self.agents["tracking"].reset()
         self.agents["decision"].reset()
 
-        # Re-run tracking for the new day
+        # --- Tracking agent ---
         self.state["current_agent"] = "tracking"
-        self.state["tracking"] = self.agents["tracking"].execute(
+        tracking_result = self.agents["tracking"].execute(
             {"tasks": original_tasks, "day": day},
             ctx,
         )
-        self.state["tasks"] = self.state["tracking"]["tasks"]
+        self.state["tracking"] = tracking_result
 
-        # Re-run decision agent
+        # Safe read: tracking may return None or omit "tasks" on failure.
+        # Keep original tasks as the fallback so the UI always has data.
+        tracking_tasks = (
+            tracking_result.get("tasks")
+            if isinstance(tracking_result, dict)
+            else None
+        )
+        self.state["tasks"] = tracking_tasks or original_tasks
+
+        # --- Decision agent ---
         self.state["current_agent"] = "decision"
-        self.state["decision"] = self.agents["decision"].execute(
+        decision_result = self.agents["decision"].execute(
             {
                 "tasks": self.state["tasks"],
-                "issues": self.state["tracking"].get("issues", []),
-                "intelligence": self.state["intelligence"],
+                # Safe read: "issues" may be absent from tracking result
+                "issues": (tracking_result or {}).get("issues", []),
+                "intelligence": self.state.get("intelligence"),
                 "day": day,
             },
             ctx,
         )
-        self.state["tasks"] = self.state["decision"]["tasks"]
+        self.state["decision"] = decision_result
+
+        # Three-level fallback for tasks after the decision agent:
+        #   1. decision["tasks"]   — preferred: corrective actions applied
+        #   2. tracking["tasks"]   — fallback: pre-decision task state
+        #   3. state["tasks"]      — last resort: whatever existed before this call
+        decision_tasks = (
+            decision_result.get("tasks")
+            if isinstance(decision_result, dict)
+            else None
+        )
+        self.state["tasks"] = (
+            decision_tasks
+            or tracking_tasks
+            or self.state["tasks"]
+        )
+
         self.state["current_day"] = day
         self.state["current_agent"] = None
 
+        # Safe reads for audit log counters — default to 0 if keys are missing
+        issue_count = len((tracking_result or {}).get("issues", []))
+        action_count = len((decision_result or {}).get("actions_taken", []))
         self.audit_logger.log(
             "Orchestrator",
             f"Day {day} simulation complete",
-            f"Tasks updated. Issues: {len(self.state['tracking'].get('issues', []))}. "
-            f"Actions: {len(self.state['decision'].get('actions_taken', []))}.",
+            f"Tasks updated. Issues: {issue_count}. Actions: {action_count}.",
         )
 
         return self.state

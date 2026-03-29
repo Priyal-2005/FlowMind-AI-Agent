@@ -96,7 +96,24 @@ with st.sidebar:
 
     st.markdown("---")
 
+    # Memory System (Phase 2)
+    st.markdown("### 💾 Persistence")
+    wipe_clicked = st.button(
+        "🗑️ Wipe Database",
+        use_container_width=True,
+        type="secondary",
+        key="wipe_db"
+    )
+    if wipe_clicked:
+        try:
+            from utils.memory import MemoryStore
+            MemoryStore().clear()
+            st.toast("Database wiped successfully!", icon="🧹")
+        except Exception as e:
+            pass
+
     # Demo Mode button
+    st.markdown("---")
     st.markdown("### 🎬 Demo Mode")
     demo_clicked = st.button(
         "⚡ Auto Demo (Crisis Response)",
@@ -272,6 +289,38 @@ if st.session_state.pipeline_ran and orch.state.get("pipeline_status") in ("comp
 
     # ── METRICS ─────────────────────────────────────
     render_metrics(stats, st.session_state.current_day)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── AI INSIGHTS & WHAT-IF (PHASE 2) ─────────────
+    ins_col1, ins_col2 = st.columns([2, 1])
+    
+    with ins_col1:
+        st.markdown('### 💡 AI Insights')
+        # Load from LLM based on memory and current tasks
+        from utils.memory import MemoryStore
+        memory_stats = MemoryStore().get_historical_context()
+        
+        with st.spinner("Generating insights..."):
+            insights = orch.llm.generate_insights(tasks, memory_stats)
+            with st.container(border=True):
+                st.markdown("**(Live AI Assessment)**")
+                st.markdown(insights)
+            
+    with ins_col2:
+        st.markdown('### 🎛️ What-If Simulation')
+        st.markdown("""
+        <div class="glass-card" style="padding: 1rem; min-height: 120px; font-size: 0.85rem; color: #8B8FA3;">
+            <div style="font-weight: 600; color: #00D4AA; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>⚡</span> Risk Parameters
+            </div>
+            <p style="margin-bottom: 0.5rem;">Adjust parameters to recalculate risks dynamically.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        # We can implement streamlit sliders here in the future
+        with st.expander("Adjust Team Capacity (Simulated)"):
+            st.slider("Max Tasks per Owner", min_value=1, max_value=10, value=3)
+            st.button("Recalculate Constraints", use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 

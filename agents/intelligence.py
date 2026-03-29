@@ -58,19 +58,32 @@ class IntelligenceAgent(BaseAgent):
         else:
             self.add_log("✅ All tasks have owners assigned")
 
-        # Check for overloaded owners
-        self.add_log("📊 Analyzing team workload distribution...")
+        # Check for overloaded owners and historical bottlenecks
+        self.add_log("📊 Analyzing team workload distribution & history...")
         time.sleep(0.3)
         from collections import Counter
+        from utils.memory import MemoryStore
+        memory = MemoryStore()
+        
         owner_load = Counter(item["owner"] for item in action_items if item.get("owner"))
-        overloaded = {k: v for k, v in owner_load.items() if v >= 3}
+        overloaded = {}
+        
+        for owner, count in owner_load.items():
+            stats = memory.get_owner_stats(owner)
+            # Mark overloaded if >= 3 tasks OR (>= 2 tasks AND historical delay rate >= 40%)
+            if count >= 3 or (count >= 2 and stats.get("delay_rate", 0.0) >= 0.4):
+                overloaded[owner] = count
+                
         if overloaded:
             for owner, count in overloaded.items():
-                self.add_log(f"🔴 {owner} is overloaded with {count} tasks!")
+                stats = memory.get_owner_stats(owner)
+                delay_rate = int(stats.get("delay_rate", 0.0) * 100)
+                
+                self.add_log(f"🔴 {owner} flagged as bottleneck ({count} tasks, {delay_rate}% past delay rate)")
                 logger.log(
                     self.name,
-                    f"Overloaded team member: {owner} ({count} tasks)",
-                    f"Research shows productivity drops 40% when handling more than 3 concurrent tasks. "
+                    f"Bottleneck risk: {owner} ({count} tasks, {delay_rate}% historical delay rate)",
+                    f"Research shows productivity drops significantly when handling multiple concurrent tasks, especially with historical delay precursors. "
                     f"Recommending redistribution to maintain team velocity.",
                     severity="WARNING",
                 )

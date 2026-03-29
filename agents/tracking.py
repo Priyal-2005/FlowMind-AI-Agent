@@ -58,6 +58,10 @@ class TrackingAgent(BaseAgent):
             day_snapshots[f"day_{d}"] = deepcopy(current_tasks)
             time.sleep(0.2)
 
+        # ── PREDICTIVE ANALYSIS (PHASE 2) ───────────
+        self.add_log("🔮 Running predictive risk algorithm...")
+        current_tasks = self.predict_future_risks(current_tasks)
+
         # Analyze current state
         issues = self._detect_issues(current_tasks, day, logger)
 
@@ -100,6 +104,57 @@ class TrackingAgent(BaseAgent):
                 "total": len(current_tasks),
             },
         }
+
+    def predict_future_risks(self, tasks: list) -> list:
+        """Predict if tasks will be delayed by Day 3 based on heuristics and memory."""
+        from utils.memory import MemoryStore
+        memory = MemoryStore()
+        
+        for task in tasks:
+            # Skip completed or already delayed tasks
+            if task.get("status") in ("completed", "delayed", "blocked"):
+                task["predicted_delay"] = False
+                continue
+                
+            risk_score = 0.0
+            
+            # Factor 1: Baseline Priority and Risk flags
+            if task.get("priority") == "P0":
+                risk_score += 0.25
+            elif task.get("priority") == "P1":
+                risk_score += 0.10
+                
+            if task.get("risk_flag") == "HIGH":
+                risk_score += 0.40
+                
+            # Factor 2: Assignment
+            owner = task.get("owner", "UNASSIGNED")
+            if owner == "UNASSIGNED":
+                risk_score += 0.60
+                
+            # Factor 3: Historical Owner Performance
+            if owner != "UNASSIGNED":
+                stats = memory.get_owner_stats(owner)
+                historical_delay_rate = stats.get("delay_rate", 0.0)
+                risk_score += (historical_delay_rate * 0.4)
+                
+            # Factor 4: Progress stalling
+            progress = task.get("progress", 0)
+            if task.get("status") == "in-progress" and progress < 20:
+                risk_score += 0.30
+                
+            # Cap at 98%
+            predicted_delay = risk_score >= 0.60
+            confidence_score = min(int(risk_score * 100), 98)
+            
+            if predicted_delay:
+                task["predicted_delay"] = True
+                task["confidence_score"] = confidence_score
+                self.add_log(f"  ⚠️ Predicted Delay: {task['id']} ({confidence_score}% probability)")
+            else:
+                task["predicted_delay"] = False
+                
+        return tasks
 
     def _simulate_day(self, tasks: list, day: int, logger) -> list:
         """Simulate progress for a single day — fully deterministic."""

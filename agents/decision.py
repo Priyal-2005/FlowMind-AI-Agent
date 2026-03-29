@@ -37,7 +37,12 @@ class DecisionAgent(BaseAgent):
         issues = input_data.get("issues", [])
         intelligence = input_data.get("intelligence", {})
         day = input_data.get("day", 1)
-        logger = context["logger"]
+        llm = context.get("llm")
+        
+        from utils.memory import MemoryStore
+        from utils.integrations import MockIntegrations
+        memory = MemoryStore()
+        integrations = MockIntegrations(logger)
 
         logger.log(
             self.name,
@@ -64,85 +69,156 @@ class DecisionAgent(BaseAgent):
         if not all_owners:
             all_owners = FALLBACK_TEAM[:3]
 
-        # ── PROCESS ISSUES ──────────────────────────
-        processed_task_ids = set()
+        # ── LLM DECISION ENGINE ─────────────────────
+        self.add_log("🧠 Consulting Gemini Decision Model...")
+        llm_actions = llm.decide_actions(tasks, issues, intelligence) if llm else None
+        
+        if llm_actions:
+            self.add_log(f"✨ AI made {len(llm_actions)} decisions. Executing dynamically...")
+            for llm_action in llm_actions:
+                task_id = llm_action.get("task_id")
+                task = next((t for t in tasks if t["id"] == task_id), None)
+                if not task:
+                    continue
+                    
+                atype = llm_action.get("type", "")
+                reason = llm_action.get("reason", "No reason provided by AI.")
+                target = llm_action.get("target_owner")
+                
+                record = {
+                    "type": atype,
+                    "task_id": task_id,
+                    "task_title": task["title"],
+                    "reasoning": reason,
+                    "owner": target or task.get("owner"),
+                    "action": f"AI decided {atype} targeting {target}",
+                    "icon": "🤖"
+                }
 
-        for issue in issues:
-            issue_type = issue["type"]
-            task_id = issue["task_id"]
+                if atype == "auto_assignment":
+                    if target:
+                        task["owner"] = target
+                        task["auto_assigned"] = True
+                        task["ai_decision"] = True
+                        owner_workload[target] = owner_workload.get(target, 0) + 1
+                        integrations.send_slack_message(target, f"You've been auto-assigned '{task['title']}' by the AI Orchestrator. Reason: {reason}")
+                        actions_taken.append(record)
+                        self.add_log(f"  👤 AI-ASSIGN: {task_id} → {target}")
+                        logger.log(self.name, f"AI ASSIGN: {task_id} → {target}", reason, severity="ACTION")
 
-            # Avoid double-processing same task for same issue type
-            issue_key = f"{task_id}:{issue_type}"
-            if issue_key in processed_task_ids:
-                continue
-            processed_task_ids.add(issue_key)
-
-            task = next((t for t in tasks if t["id"] == task_id), None)
-            if not task:
-                continue
-
-            if issue_type == "unassigned":
-                action = self._auto_assign(task, all_owners, owner_workload, logger)
-                if action:
-                    actions_taken.append(action)
-
-            elif issue_type == "overdue":
-                action = self._handle_overdue(task, day, logger)
-                actions_taken.append(action)
-                if task["priority"] == "P0":
-                    esc = self._escalate(task, "P0 task overdue — immediate executive attention required", logger)
-                    escalations.append(esc)
-                elif task["priority"] == "P1" and day >= 3:
-                    esc = self._escalate(task, "P1 task overdue on final day", logger)
-                    escalations.append(esc)
-
-            elif issue_type == "delayed":
-                action = self._handle_delay(task, day, all_owners, owner_workload, logger)
-                actions_taken.append(action)
-                reminder = self._send_reminder(task, f"Task delayed on Day {day}", logger)
-                reminders.append(reminder)
-
-            elif issue_type == "stalled":
-                reminder = self._send_reminder(task, f"Progress stalled at {task.get('progress', 0)}%", logger)
-                reminders.append(reminder)
-                if task["priority"] in ("P0", "P1"):
-                    esc = self._escalate(
-                        task,
-                        f"High-priority task stalled at {task.get('progress', 0)}% on Day {day}",
-                        logger,
-                    )
-                    escalations.append(esc)
-
-            time.sleep(0.1)
-
-        # ── PROACTIVE: Check overloaded owners ──────
-        for owner, count in owner_workload.items():
-            if count >= 3:
-                redistributed = self._redistribute_workload(
-                    owner, tasks, all_owners, owner_workload, logger
-                )
-                actions_taken.extend(redistributed)
-
-        # ── PROACTIVE: Day 1 — auto-assign all UNASSIGNED that weren't caught ──
-        # This ensures even if tracking didn't flag them, we auto-assign
-        for task in tasks:
-            if task.get("owner") == "UNASSIGNED" and task["status"] != "completed":
-                already_processed = f"{task['id']}:unassigned" in processed_task_ids
-                if not already_processed:
+                elif atype == "reassignment":
+                    if target:
+                        old_owner = task["owner"]
+                        task["owner"] = target
+                        task["reassigned"] = True
+                        task["ai_decision"] = True
+                        integrations.send_slack_message(target, f"Task reassigned to you from {old_owner}: '{task['title']}'. Reason: {reason}")
+                        actions_taken.append(record)
+                        self.add_log(f"  🔄 AI-REASSIGN: {task_id} {old_owner} → {target}")
+                        logger.log(self.name, f"AI REASSIGN: {task_id} {old_owner} → {target}", reason, severity="ACTION")
+                        
+                elif atype == "escalation":
+                    task["escalated"] = True
+                    task["ai_decision"] = True
+                    esc_target = target or "Engineering Manager"
+                    integrations.send_email(esc_target, f"URGENT Escalation: {task_id}", f"The AI has escalated '{task['title']}'. Reason: {reason}")
+                    escalations.append(record)
+                    self.add_log(f"  🚨 AI-ESCALATION: {task_id} → {esc_target}")
+                    logger.log(self.name, f"AI ESCALATION: {task_id} → {esc_target}", reason, severity="ESCALATION")
+                    
+                elif atype == "reminder":
+                    target = target or task["owner"]
+                    integrations.send_slack_message(target, f"Reminder for '{task['title']}': {reason}")
+                    reminders.append(record)
+                    self.add_log(f"  🔔 AI-REMINDER: {target} for {task_id}")
+                    logger.log(self.name, f"AI REMINDER: {task_id} → {target}", reason, severity="ACTION")
+                    
+                time.sleep(0.1)
+                
+            # Proactive assignment for stragglers that LLM might have missed
+            for task in tasks:
+                if task.get("owner") == "UNASSIGNED" and task["status"] != "completed":
                     action = self._auto_assign(task, all_owners, owner_workload, logger)
                     if action:
                         actions_taken.append(action)
+                        integrations.send_slack_message(task["owner"], f"Fallback Auto-assignment: {task['title']}")
 
-        # ── PROACTIVE: P0 high-risk reminder on Day 1 ──
-        if day == 1:
-            for task in tasks:
-                if task.get("priority") == "P0" and task.get("risk_flag") == "HIGH":
-                    reminder = self._send_reminder(
-                        task,
-                        "P0 high-risk task — monitoring closely from Day 1",
-                        logger,
-                    )
+        else:
+            self.add_log("⚙️ Gemini unavailable or declined. Using deterministic fallback engine...")
+            
+            processed_task_ids = set()
+            for issue in issues:
+                issue_type = issue["type"]
+                task_id = issue["task_id"]
+
+                issue_key = f"{task_id}:{issue_type}"
+                if issue_key in processed_task_ids:
+                    continue
+                processed_task_ids.add(issue_key)
+
+                task = next((t for t in tasks if t["id"] == task_id), None)
+                if not task:
+                    continue
+
+                if issue_type == "unassigned":
+                    action = self._auto_assign(task, all_owners, owner_workload, logger)
+                    if action:
+                        actions_taken.append(action)
+                        integrations.send_slack_message(task["owner"], f"You've been auto-assigned '{task['title']}'")
+
+                elif issue_type == "overdue":
+                    action = self._handle_overdue(task, day, logger)
+                    actions_taken.append(action)
+                    if task["priority"] == "P0":
+                        esc = self._escalate(task, "P0 task overdue — immediate executive attention required", logger)
+                        escalations.append(esc)
+                        integrations.send_email("CTO", f"P0 Escalation: {task['title']}", esc["reasoning"])
+                    elif task["priority"] == "P1" and day >= 3:
+                        esc = self._escalate(task, "P1 task overdue on final day", logger)
+                        escalations.append(esc)
+                        integrations.send_email("Manager", f"P1 Escalation: {task['title']}", esc["reasoning"])
+
+                elif issue_type == "delayed":
+                    action = self._handle_delay(task, day, all_owners, owner_workload, logger)
+                    actions_taken.append(action)
+                    reminder = self._send_reminder(task, f"Task delayed on Day {day}", logger)
                     reminders.append(reminder)
+                    integrations.send_slack_message(task["owner"], f"Task Delayed Reminder: {task['title']}")
+
+                elif issue_type == "stalled":
+                    reminder = self._send_reminder(task, f"Progress stalled at {task.get('progress', 0)}%", logger)
+                    reminders.append(reminder)
+                    integrations.send_slack_message(task["owner"], f"Task Stalled Reminder: {task['title']}")
+                    if task["priority"] in ("P0", "P1"):
+                        esc = self._escalate(task, f"High-priority task stalled at {task.get('progress', 0)}% on Day {day}", logger)
+                        escalations.append(esc)
+                        integrations.send_email("Manager", f"Stalled Escalation: {task['title']}", esc["reasoning"])
+                time.sleep(0.1)
+
+            for owner, count in owner_workload.items():
+                if count >= 3:
+                    redistributed = self._redistribute_workload(owner, tasks, all_owners, owner_workload, logger)
+                    for r in redistributed:
+                        actions_taken.append(r)
+                        integrations.send_slack_message(r["new_owner"], f"Reassigned to you due to overload: {r['task_title']}")
+
+            for task in tasks:
+                if task.get("owner") == "UNASSIGNED" and task["status"] != "completed":
+                    if f"{task['id']}:unassigned" not in processed_task_ids:
+                        action = self._auto_assign(task, all_owners, owner_workload, logger)
+                        if action:
+                            actions_taken.append(action)
+                            integrations.send_slack_message(task["owner"], f"Fallback Auto-assignment: {task['title']}")
+
+            if day == 1:
+                for task in tasks:
+                    if task.get("priority") == "P0" and task.get("risk_flag") == "HIGH":
+                        reminder = self._send_reminder(task, "P0 high-risk task — monitoring closely from Day 1", logger)
+                        reminders.append(reminder)
+                        integrations.send_slack_message(task["owner"], f"P0 High Risk Alert: {task['title']}")
+
+        # ── PERSIST TO INTERNAL MEMORY ──────────────
+        memory.save_run(tasks, actions_taken + escalations + reminders)
 
         # ── SUMMARY ─────────────────────────────────
         self.add_log(f"\n🤖 Autonomous Actions Summary — Day {day}:")

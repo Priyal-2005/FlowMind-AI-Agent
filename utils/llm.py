@@ -409,6 +409,61 @@ Meeting Data:
 
         return risks
 
+    # ── DECISION ACTIONS (PHASE 2) ─────────────────────────────
+
+    def decide_actions(self, tasks: list, issues: list, context: dict) -> Optional[list]:
+        """Dynamically decide actions for current issues using Gemini."""
+        if not self.use_llm:
+            return None
+
+        prompt = f"""You are the Decision Agent in an autonomous enterprise workflow system.
+Review the following tasks and active issues, and decide the best corrective actions based on priority, risk, and team workload context.
+
+Return ONLY a valid JSON array matching this exact schema:
+```json
+[
+  {{
+    "type": "auto_assignment | reassignment | escalation | reminder",
+    "task_id": "TASK-001",
+    "target_owner": "Name of person (or 'Engineering Manager' for escalation)",
+    "reason": "Clear data-driven reasoning for the action",
+    "priority": "HIGH|MEDIUM|LOW"
+  }}
+]
+```
+
+Tasks:
+{json.dumps([{k: v for k, v in t.items() if k in ('id', 'title', 'owner', 'priority', 'status', 'progress', 'deadline', 'risk_flag')} for t in tasks], indent=2)}
+
+Issues detected:
+{json.dumps(issues, indent=2)}
+
+Team Workload Context:
+{json.dumps(context.get('owner_workload', {}), indent=2)}
+"""
+        response = self._call_gemini(prompt)
+        if response:
+            parsed = self._parse_json_from_response(response)
+            if isinstance(parsed, list):
+                return parsed
+        return None
+
+    def generate_insights(self, tasks: list, memory_stats: dict) -> str:
+        """Generate high-level AI insights for the UI panel."""
+        if not self.use_llm:
+            return "AI Insights require Gemini API access. Please configure your API key."
+
+        prompt = f"""You are an elite project management AI. Based on the current tasks and historical team memory stats, generate a concise, 3-bullet-point summary of key insights. Highlight overloaded employees, highest risk tasks, and suggested optimizations. Do not use markdown headers, just return a bulleted list.
+
+Current Tasks (state):
+{json.dumps([{k: v for k, v in t.items() if k in ('id', 'owner', 'status', 'progress', 'priority', 'risk_flag')} for t in tasks], indent=2)}
+
+Team Memory / Performance Stats:
+{json.dumps(memory_stats, indent=2)}
+"""
+        response = self._call_gemini(prompt)
+        return response.strip() if response else "Insight generation failed."
+
     # ── REASONING GENERATION ───────────────────────────────────
 
     def generate_reasoning(self, agent_name: str, context: str, action: str) -> str:

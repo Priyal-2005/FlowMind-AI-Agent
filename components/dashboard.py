@@ -115,6 +115,11 @@ def render_task_table(tasks: list):
             # Risk flag
             risk = task.get("risk_flag", "LOW")
             risk_badge = f'<span class="badge badge-{risk.lower()}">{risk}</span>'
+            
+            if task.get("predicted_delay"):
+                conf = task.get("confidence_score", 0)
+                risk_badge += f'&nbsp;<span class="badge badge-high" style="background: rgba(255, 184, 0, 0.1); color: #FFB800; border-color: rgba(255, 184, 0, 0.3);" title="Predicted Delay based on historical memory">🔮 Risk: {conf}%</span>'
+
 
             # Owner
             owner = task.get("owner", "UNASSIGNED")
@@ -145,6 +150,8 @@ def render_task_table(tasks: list):
             # Task info
             task_id = h(task.get("id", ""))
             title = h(task.get("title", ""))
+            if task.get("ai_decision"):
+                 title += ' <span style="font-size: 0.65rem; color: #6C63FF; border: 1px solid rgba(108, 99, 255, 0.4); background: rgba(108, 99, 255, 0.1); padding: 1px 4px; border-radius: 4px; margin-left: 5px;">🤖 Gemini</span>'
             deadline = h(task.get("deadline", "—"))
 
             # Render columns

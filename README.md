@@ -226,3 +226,12 @@ google-generativeai>=0.5.0  # Optional — for AI mode
 3. **Auditability** — Every decision is logged with full reasoning and timestamp
 4. **Determinism** — Time simulation produces consistent results for demo reliability
 5. **Autonomy** — Decision agent always acts — never passive, always adds value
+
+## 🧠 Why This Wins
+
+Unlike traditional meeting assistants, this system:
+- Doesn’t just extract → it executes
+- Doesn’t just suggest → it acts autonomously
+- Doesn’t just track → it predicts and prevents failure
+
+This is a true Agentic AI system.

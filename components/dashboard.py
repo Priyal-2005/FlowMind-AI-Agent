@@ -99,92 +99,78 @@ def render_task_table(tasks: list):
         st.info("No tasks created yet. Run the workflow to generate tasks.")
         return
 
-    # Build table HTML
-    table_html = '''
-    <table class="task-table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Task</th>
-                <th>Owner</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Risk</th>
-                <th>Deadline</th>
-                <th>Progress</th>
-            </tr>
-        </thead>
-        <tbody>
-    '''
-
     for task in tasks:
-        # Status badge
-        status = task.get("status", "pending")
-        status_icon = {"completed": "✅", "in-progress": "🔄", "pending": "⏳", "delayed": "⚠️", "blocked": "🚫"}.get(status, "")
-        status_badge = f'<span class="badge badge-{status}">{status_icon} {status.upper()}</span>'
+        with st.container(border=True):
+            cols = st.columns([1.5, 3.5, 2, 2, 2])
 
-        # Priority badge
-        priority = task.get("priority", "P2")
-        priority_badge = f'<span class="badge badge-{priority.lower()}">{priority}</span>'
+            # Status badge
+            status = task.get("status", "pending")
+            status_icon = {"completed": "✅", "in-progress": "🔄", "pending": "⏳", "delayed": "⚠️", "blocked": "🚫"}.get(status, "")
+            status_badge = f'<span class="badge badge-{status}">{status_icon} {status.upper()}</span>'
 
-        # Risk badge
-        risk = task.get("risk_flag", "LOW")
-        risk_badge = f'<span class="badge badge-{risk.lower()}">{risk}</span>'
+            # Priority badge
+            priority = task.get("priority", "P2")
+            priority_badge = f'<span class="badge badge-{priority.lower()}">{priority}</span>'
 
-        # Owner
-        owner = task.get("owner", "UNASSIGNED")
-        owner_display = owner
-        if owner == "UNASSIGNED":
-            owner_display = '<span style="color: #FF4B4B; font-weight: 600;">⚠️ UNASSIGNED</span>'
-        elif task.get("auto_assigned"):
-            owner_display = f'<span style="color: #00D4AA;" title="Auto-assigned by AI">{owner} 🤖</span>'
-        elif task.get("reassigned"):
-            owner_display = f'<span style="color: #F093FB;" title="Reassigned by AI">{owner} 🔄</span>'
-        elif task.get("redistributed"):
-            owner_display = f'<span style="color: #FFB800;" title="Redistributed by AI">{owner} ⚖️</span>'
+            # Risk flag
+            risk = task.get("risk_flag", "LOW")
+            risk_badge = f'<span class="badge badge-{risk.lower()}">{risk}</span>'
 
-        # Progress bar
-        progress = task.get("progress", 0)
-        if status == "completed":
-            progress = 100
-        elif status == "pending" and progress == 0:
-            progress = 0
-        progress_color = "green" if progress >= 75 else "blue" if progress >= 40 else "yellow" if progress > 0 else "red"
-        progress_html = f'''
-        <div class="progress-bar-container">
-            <div class="progress-bar-fill progress-{progress_color}" style="width: {progress}%;"></div>
-        </div>
-        <span style="font-size: 0.65rem; color: #8B8FA3; font-family: 'JetBrains Mono', monospace;">{progress}%</span>
-        '''
+            # Owner
+            owner = task.get("owner", "UNASSIGNED")
+            owner_display = h(owner)
+            if owner == "UNASSIGNED":
+                owner_display = '<span style="color: #FF4B4B; font-weight: 600;">⚠️ UNASSIGNED</span>'
+            elif task.get("auto_assigned"):
+                owner_display = f'<span style="color: #00D4AA;" title="Auto-assigned by AI">{h(owner)} 🤖</span>'
+            elif task.get("reassigned"):
+                owner_display = f'<span style="color: #F093FB;" title="Reassigned by AI">{h(owner)} 🔄</span>'
+            elif task.get("redistributed"):
+                owner_display = f'<span style="color: #FFB800;" title="Redistributed by AI">{h(owner)} ⚖️</span>'
 
-        # Title (truncate if needed)
-        title = task.get("title", "")
-        title_display = title[:55] + "..." if len(title) > 55 else title
+            # Progress bar HTML
+            progress = task.get("progress", 0)
+            if status == "completed":
+                progress = 100
+            elif status == "pending" and progress == 0:
+                progress = 0
+            progress_color = "green" if progress >= 75 else "blue" if progress >= 40 else "yellow" if progress > 0 else "red"
+            progress_html = (
+                f'<div style="margin-top: 0.5rem; margin-bottom: 0.2rem;" class="progress-bar-container">'
+                f'<div class="progress-bar-fill progress-{progress_color}" style="width: {progress}%;"></div>'
+                f'</div>'
+                f'<div style="font-size: 0.75rem; color: #8B8FA3; text-align: right;">{progress}%</div>'
+            )
 
-        # Row highlight class for delayed/blocked
-        row_class = ""
-        if status == "delayed":
-            row_class = "row-delayed"
-        elif status == "blocked":
-            row_class = "row-blocked"
-        elif status == "completed":
-            row_class = "row-completed"
+            # Task info
+            task_id = h(task.get("id", ""))
+            title = h(task.get("title", ""))
+            deadline = h(task.get("deadline", "—"))
 
-        table_html += f'''
-        <tr class="{row_class}">
-            <td><span class="task-id">{task.get("id", "")}</span></td>
-            <td>{title_display}</td>
-            <td>{owner_display}</td>
-            <td>{status_badge}</td>
-            <td>{priority_badge}</td>
-            <td>{risk_badge}</td>
-            <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">{task.get("deadline", "—")}</span></td>
-            <td style="min-width: 80px;">{progress_html}</td>
-        </tr>
-        '''
+            # Render columns
+            with cols[0]:
+                st.markdown(f"**{task_id}**")
+                st.markdown(priority_badge, unsafe_allow_html=True)
+            
+            with cols[1]:
+                st.markdown(f"<div style='font-size: 0.95rem; font-weight: 500; margin-bottom: 0.3rem;'>{title}</div>", unsafe_allow_html=True)
+                if risk != "LOW":
+                    st.markdown(f"<div style='margin-top: 0.2rem;'>{risk_badge}</div>", unsafe_allow_html=True)
 
-    table_html += '</tbody></table>'
-    st.markdown(table_html, unsafe_allow_html=True)
+            with cols[2]:
+                st.markdown("<div style='color: #8B8FA3; font-size: 0.75rem; margin-bottom: 0.2rem;'>Owner</div>", unsafe_allow_html=True)
+                st.markdown(owner_display, unsafe_allow_html=True)
+            
+            with cols[3]:
+                st.markdown("<div style='color: #8B8FA3; font-size: 0.75rem; margin-bottom: 0.2rem;'>Status & Deadline</div>", unsafe_allow_html=True)
+                st.markdown(status_badge, unsafe_allow_html=True)
+                st.markdown(f"<div style='font-size: 0.8rem; margin-top: 0.3rem;'>{deadline}</div>", unsafe_allow_html=True)
+            
+            with cols[4]:
+                st.markdown("<div style='color: #8B8FA3; font-size: 0.75rem;'>Progress</div>", unsafe_allow_html=True)
+                st.markdown(progress_html, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
 
 def render_day_simulation(current_day: int):

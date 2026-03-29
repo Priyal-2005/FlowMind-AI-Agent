@@ -181,33 +181,31 @@ if run_clicked and transcript_text.strip():
     new_orch = MeetingOrchestrator()
     st.session_state.orchestrator = new_orch
 
-    with st.spinner(""):
+    import time
+    with st.status("🎯 Orchestrator initializing pipeline...", expanded=True) as status:
         stages = [
-            ("🔍 Extraction Agent — Parsing transcript...", 0.17),
-            ("🧠 Intelligence Agent — Analyzing risks...", 0.34),
-            ("⚡ Execution Agent — Creating tasks...", 0.51),
-            ("📊 Tracking Agent — Simulating Day 1...", 0.68),
-            ("🤖 Decision Agent — Taking autonomous actions...", 0.85),
-            ("✅ Pipeline complete — All agents succeeded!", 1.0),
+            "🔍 Extraction Agent — Parsing transcript...",
+            "🧠 Intelligence Agent — Analyzing risks...",
+            "⚡ Execution Agent — Creating tasks...",
+            "📊 Tracking Agent — Simulating Day 1...",
+            "🤖 Decision Agent — Taking autonomous actions...",
         ]
-
-        progress_bar = st.progress(0, text="🎯 Orchestrator initializing pipeline...")
-
-        import time
-        for stage_text, stage_progress in stages:
-            progress_bar.progress(stage_progress, text=stage_text)
-            time.sleep(0.35)
-
+        
+        for stage in stages:
+            st.write(stage)
+            time.sleep(0.65)
+            
+        st.write("⚙️ Executing intelligence core...")
+        
         # Actually run the pipeline
         result = st.session_state.orchestrator.run_pipeline(transcript_text.strip())
+        
+        status.update(label="✅ Pipeline complete — All agents succeeded!", state="complete", expanded=False)
+        time.sleep(0.4)
 
-        st.session_state.pipeline_ran = True
-        st.session_state.current_day = 1
-
-        progress_bar.progress(1.0, text="✅ All agents executed successfully!")
-        time.sleep(0.5)
-        progress_bar.empty()
-
+    st.session_state.pipeline_ran = True
+    st.session_state.current_day = 1
+    
     st.rerun()
 
 

@@ -34,14 +34,14 @@ def render_pipeline(agents: list, current_agent: str = None):
 
         time_display = f"{agent.execution_time}s" if agent.execution_time > 0 else "—"
 
-        cards_html += f'''
-        <div class="agent-card {status_class}">
-            <div class="agent-icon">{agent.icon}</div>
-            <div class="agent-name">{agent.name}</div>
-            <span class="agent-status status-{status_class}">{status_labels.get(status_class, "WAITING")}</span>
-            <div class="agent-time">{time_display}</div>
-        </div>
-        '''
+        cards_html += (
+            f'<div class="agent-card {status_class}">'
+            f'<div class="agent-icon">{agent.icon}</div>'
+            f'<div class="agent-name">{agent.name}</div>'
+            f'<span class="agent-status status-{status_class}">{status_labels.get(status_class, "WAITING")}</span>'
+            f'<div class="agent-time">{time_display}</div>'
+            f'</div>'
+        )
 
         # Add arrow between agents (not after last)
         if i < len(agents) - 1:
@@ -64,8 +64,19 @@ def render_agent_logs(agents: list):
     for agent in completed_agents:
         if agent.logs:
             with st.expander(f"{agent.icon} {agent.name} — {len(agent.logs)} entries ({agent.execution_time}s)", expanded=False):
-                log_html = '<div class="log-container">'
                 for line in agent.logs:
-                    log_html += f'<div class="log-line">{line}</div>'
-                log_html += '</div>'
-                st.markdown(log_html, unsafe_allow_html=True)
+                    # Semantic icons based on log content
+                    icon = "🔹"
+                    line_lower = line.lower()
+                    if any(x in line_lower for x in ["success", "completed", "assigned", "done"]):
+                        icon = "✅"
+                    elif any(x in line_lower for x in ["error", "failed", "issue", "delayed", "warning", "missing"]):
+                        icon = "⚠️"
+                    elif any(x in line_lower for x in ["starting", "running", "executing", "triggered"]):
+                        icon = "🚀"
+                    elif any(x in line_lower for x in ["found", "extracted", "detected", "analyzing"]):
+                        icon = "🔍"
+                    elif any(x in line_lower for x in ["created", "generated"]):
+                        icon = "✨"
+                    
+                    st.markdown(f"{icon} {line}")

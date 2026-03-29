@@ -324,3 +324,8 @@ uvicorn                       # Optional — for REST API mode
 ## 🌐 Live Demo
 
 **[https://autonomous-meeting-orchestrator.streamlit.app/](https://autonomous-meeting-orchestrator.streamlit.app/)**
+
+## 📄 Documentation
+
+- 🏗️ Architecture: [ARCHITECTURE.md](./ARCHITECTURE.md)
+- 📈 Impact Model: [IMPACT.md](./impact.md)

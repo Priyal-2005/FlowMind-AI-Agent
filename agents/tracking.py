@@ -12,10 +12,10 @@ Detects:
 - Bottlenecks
 """
 
-import time
 from typing import Any
 from copy import deepcopy
 from agents.base import BaseAgent
+from utils.helpers import demo_sleep
 
 
 class TrackingAgent(BaseAgent):
@@ -40,7 +40,7 @@ class TrackingAgent(BaseAgent):
             f"Applying realistic progression patterns based on priority, risk, and ownership.",
         )
         self.add_log(f"📊 Simulating Day {day} progress for {len(tasks)} tasks...")
-        time.sleep(0.3)
+        demo_sleep(context, 0.3)
 
         # Ensure all tasks have required fields initialized
         for task in tasks:
@@ -56,7 +56,7 @@ class TrackingAgent(BaseAgent):
         for d in range(1, day + 1):
             current_tasks = self._simulate_day(current_tasks, d, logger)
             day_snapshots[f"day_{d}"] = deepcopy(current_tasks)
-            time.sleep(0.2)
+            demo_sleep(context, 0.2)
 
         # ── PREDICTIVE ANALYSIS (PHASE 2) ───────────
         self.add_log("🔮 Running predictive risk algorithm...")
@@ -162,7 +162,7 @@ class TrackingAgent(BaseAgent):
         for idx, task in enumerate(tasks):
             prev_status = task["status"]
             prev_progress = task.get("progress", 0)
-            task = self._update_task_for_day(task, day, idx)
+            task = self._update_task_for_day(task, day, idx, tasks)
 
             if task["status"] != prev_status or task.get("progress", 0) != prev_progress:
                 status_icon = {
@@ -195,7 +195,18 @@ class TrackingAgent(BaseAgent):
 
         return tasks
 
-    def _update_task_for_day(self, task: dict, day: int, task_idx: int = 0) -> dict:
+    def _dependencies_unmet(self, task: dict, all_tasks: list) -> bool:
+        dep_ids = task.get("dependencies") or []
+        if not dep_ids:
+            return False
+        by_id = {t.get("id"): t for t in all_tasks if t.get("id")}
+        for dep_id in dep_ids:
+            dep_task = by_id.get(dep_id)
+            if not dep_task or dep_task.get("status") != "completed":
+                return True
+        return False
+
+    def _update_task_for_day(self, task: dict, day: int, task_idx: int, all_tasks: list) -> dict:
         """Deterministic task state update based on properties and task index."""
         priority = task["priority"]
         risk = task["risk_flag"]
@@ -296,10 +307,16 @@ class TrackingAgent(BaseAgent):
                     task["delay_reason"] = "Day 3 deadline reached, task not started"
                     task["progress"] = 0
 
-        # Blocked task check (if has unmet dependencies)
-        if task.get("dependencies") and status != "completed":
+        # Completed tasks are never forced back to blocked
+        if task.get("status") == "completed":
+            task["progress"] = 100
+            return task
+
+        # Block only when dependency tasks are not completed (not merely listed)
+        if self._dependencies_unmet(task, all_tasks):
             task["status"] = "blocked"
-            task["delay_reason"] = f"Blocked by: {', '.join(task['dependencies'])}"
+            dep_ids = task.get("dependencies") or []
+            task["delay_reason"] = f"Blocked by incomplete dependencies: {', '.join(dep_ids)}"
 
         return task
 
@@ -314,8 +331,8 @@ class TrackingAgent(BaseAgent):
             except (ValueError, AttributeError):
                 deadline_day = 3
 
-            # Overdue tasks
-            if day >= deadline_day and task["status"] not in ("completed",):
+            # Overdue only after the deadline day has fully passed
+            if day > deadline_day and task["status"] not in ("completed",):
                 issue = {
                     "type": "overdue",
                     "task_id": task["id"],

@@ -44,38 +44,49 @@ class MemoryStore:
         self._save(empty)
         return empty
 
+    def _rebuild_owner_stats(self, tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Derive owner_stats from canonical task list (avoids double-count across saves)."""
+        stats: Dict[str, Any] = {}
+        for task in tasks:
+            owner = task.get("owner")
+            if not owner or owner == "UNASSIGNED":
+                continue
+            if owner not in stats:
+                stats[owner] = {"completed": 0, "delayed": 0, "total": 0}
+            stats[owner]["total"] += 1
+            st = task.get("status")
+            if st == "completed":
+                stats[owner]["completed"] += 1
+            elif st == "delayed":
+                stats[owner]["delayed"] += 1
+        return stats
+
     def save_run(self, tasks: List[Dict[str, Any]], actions: List[Dict[str, Any]]):
         """Commit tasks and actions to persistent storage, updating owner heuristics."""
         data = self._load()
-        
-        # Save historical tasks (prevent duplicates by ID)
-        existing_task_ids = {t["id"]: i for i, t in enumerate(data["tasks"])}
-        
-        for task in tasks:
-            # Update owner stats incrementally
-            owner = task.get("owner")
-            if owner and owner != "UNASSIGNED":
-                if owner not in data["owner_stats"]:
-                    data["owner_stats"][owner] = {"completed": 0, "delayed": 0, "total": 0}
-                
-                # We check the delta from previous save to avoid double counting
-                # A proper implementation tracks task ID status changes specifically, 
-                # but for this demo a simple increment when processing a run works.
-                status = task.get("status")
-                if status == "completed":
-                    data["owner_stats"][owner]["completed"] += 1
-                elif status == "delayed":
-                    data["owner_stats"][owner]["delayed"] += 1
-                data["owner_stats"][owner]["total"] += 1
 
-            if task["id"] not in existing_task_ids:
+        existing_task_ids = {t["id"]: i for i, t in enumerate(data["tasks"])}
+
+        for task in tasks:
+            tid = task.get("id")
+            if not tid:
+                continue
+            if tid not in existing_task_ids:
                 data["tasks"].append(task)
-                existing_task_ids[task["id"]] = len(data["tasks"]) - 1
+                existing_task_ids[tid] = len(data["tasks"]) - 1
             else:
-                idx = existing_task_ids[task["id"]]
+                idx = existing_task_ids[tid]
                 data["tasks"][idx] = task
-        
-        data["actions"].extend(actions)
+
+        data["owner_stats"] = self._rebuild_owner_stats(data["tasks"])
+
+        existing_action_keys = {json.dumps(a, sort_keys=True, default=str) for a in data["actions"]}
+        for action in actions:
+            key = json.dumps(action, sort_keys=True, default=str)
+            if key not in existing_action_keys:
+                data["actions"].append(action)
+                existing_action_keys.add(key)
+
         self._save(data)
 
     def get_owner_stats(self, owner: str) -> Dict[str, Any]:

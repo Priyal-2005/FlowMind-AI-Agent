@@ -31,6 +31,8 @@ class WorkflowOrchestrator:
     def __init__(self):
         self.llm = LLMClient()
         self.audit_logger = AuditLogger()
+        # When True, agents may use artificial delays (see utils.helpers.demo_sleep).
+        self.demo_mode = False
 
         # Initialize all agents
         self.agents = {
@@ -71,7 +73,12 @@ class WorkflowOrchestrator:
         return {
             "llm": self.llm,
             "logger": self.audit_logger,
+            "demo_mode": getattr(self, "demo_mode", False),
         }
+
+    @staticmethod
+    def _agent_returned_error(result) -> bool:
+        return isinstance(result, dict) and result.get("error") is not None
 
     def reset(self):
         """Reset all state and agents."""
@@ -98,6 +105,16 @@ class WorkflowOrchestrator:
         """
         self.reset()
         self.state["transcript"] = input_text
+        if not (input_text or "").strip():
+            self.state["pipeline_status"] = "error"
+            self.audit_logger.log(
+                "Orchestrator",
+                "Pipeline rejected — empty input",
+                "No workflow text was provided; halting before agent execution.",
+                severity="WARNING",
+            )
+            return self.state
+
         self.state["pipeline_status"] = "running"
 
         ctx = self.get_context()
@@ -119,6 +136,16 @@ class WorkflowOrchestrator:
                 "First stage: Parse raw input into structured data",
             )
             self.state["extracted"] = self.agents["extraction"].execute(input_text, ctx)
+            if self._agent_returned_error(self.state["extracted"]):
+                self.state["pipeline_status"] = "error"
+                self.state["current_agent"] = None
+                self.audit_logger.log(
+                    "Orchestrator",
+                    "Pipeline halted — Extraction Agent returned an error",
+                    str(self.state["extracted"].get("error")),
+                    severity="WARNING",
+                )
+                return self.state
 
             # ── Stage 2: Intelligence ────────────────────
             # Analyze extracted data for risks and gaps
@@ -131,6 +158,16 @@ class WorkflowOrchestrator:
             self.state["intelligence"] = self.agents["intelligence"].execute(
                 self.state["extracted"], ctx
             )
+            if self._agent_returned_error(self.state["intelligence"]):
+                self.state["pipeline_status"] = "error"
+                self.state["current_agent"] = None
+                self.audit_logger.log(
+                    "Orchestrator",
+                    "Pipeline halted — Intelligence Agent returned an error",
+                    str(self.state["intelligence"].get("error")),
+                    severity="WARNING",
+                )
+                return self.state
 
             # ── Stage 3: Execution ───────────────────────
             # Create structured executable tasks
@@ -147,6 +184,16 @@ class WorkflowOrchestrator:
                 },
                 ctx,
             )
+            if self._agent_returned_error(self.state["execution"]):
+                self.state["pipeline_status"] = "error"
+                self.state["current_agent"] = None
+                self.audit_logger.log(
+                    "Orchestrator",
+                    "Pipeline halted — Execution Agent returned an error",
+                    str(self.state["execution"].get("error")),
+                    severity="WARNING",
+                )
+                return self.state
             # Safe read: execution result may be None or missing "tasks" if the agent
             # failed/returned partial data. Fall back to the existing task list.
             self.state["tasks"] = (
@@ -167,6 +214,16 @@ class WorkflowOrchestrator:
                 {"tasks": self.state["tasks"], "day": 1},
                 ctx,
             )
+            if self._agent_returned_error(self.state["tracking"]):
+                self.state["pipeline_status"] = "error"
+                self.state["current_agent"] = None
+                self.audit_logger.log(
+                    "Orchestrator",
+                    "Pipeline halted — Tracking Agent returned an error",
+                    str(self.state["tracking"].get("error")),
+                    severity="WARNING",
+                )
+                return self.state
             # Safe read: tracking result may be None or missing "tasks".
             # Fall back to the task list produced by the execution agent.
             self.state["tasks"] = (
@@ -193,6 +250,16 @@ class WorkflowOrchestrator:
                 },
                 ctx,
             )
+            if self._agent_returned_error(self.state["decision"]):
+                self.state["pipeline_status"] = "error"
+                self.state["current_agent"] = None
+                self.audit_logger.log(
+                    "Orchestrator",
+                    "Pipeline halted — Decision Agent returned an error",
+                    str(self.state["decision"].get("error")),
+                    severity="WARNING",
+                )
+                return self.state
             # Safe read (three-level fallback):
             #   1. decision["tasks"]   — preferred: decision agent applied corrections
             #   2. tracking["tasks"]   — fallback: pre-decision task state
@@ -269,6 +336,16 @@ class WorkflowOrchestrator:
             ctx,
         )
         self.state["tracking"] = tracking_result
+        if self._agent_returned_error(tracking_result):
+            self.state["pipeline_status"] = "error"
+            self.state["current_agent"] = None
+            self.audit_logger.log(
+                "Orchestrator",
+                f"Day {day} simulation halted — Tracking Agent returned an error",
+                str(tracking_result.get("error")),
+                severity="WARNING",
+            )
+            return self.state
 
         # Safe read: tracking may return None or omit "tasks" on failure.
         # Keep original tasks as the fallback so the UI always has data.
@@ -292,6 +369,16 @@ class WorkflowOrchestrator:
             ctx,
         )
         self.state["decision"] = decision_result
+        if self._agent_returned_error(decision_result):
+            self.state["pipeline_status"] = "error"
+            self.state["current_agent"] = None
+            self.audit_logger.log(
+                "Orchestrator",
+                f"Day {day} simulation halted — Decision Agent returned an error",
+                str(decision_result.get("error")),
+                severity="WARNING",
+            )
+            return self.state
 
         # Three-level fallback for tasks after the decision agent:
         #   1. decision["tasks"]   — preferred: corrective actions applied

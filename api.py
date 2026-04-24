@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from orchestrator.orchestrator import WorkflowOrchestrator
 from utils.memory import MemoryStore
 
@@ -22,6 +22,13 @@ app = FastAPI(
 class WorkflowInput(BaseModel):
     input_text: str
 
+    @field_validator("input_text")
+    @classmethod
+    def strip_non_empty(cls, v: str) -> str:
+        if v is None or not str(v).strip():
+            raise ValueError("input_text must be a non-empty string")
+        return str(v).strip()
+
 @app.post("/api/v1/orchestrate", tags=["Core Pipeline"])
 def run_orchestrator(input_data: WorkflowInput):
     """
@@ -32,7 +39,7 @@ def run_orchestrator(input_data: WorkflowInput):
         orch = WorkflowOrchestrator()
         state = orch.run_pipeline(input_data.input_text)
         
-        if state["pipeline_status"] == "error":
+        if state.get("pipeline_status") == "error":
             raise HTTPException(status_code=500, detail="Agent pipeline encountered an error.")
             
         decision = state.get("decision", {})

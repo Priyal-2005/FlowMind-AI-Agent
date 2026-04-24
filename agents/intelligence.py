@@ -9,9 +9,9 @@ Analyzes extracted input data to detect:
 - Overloaded team members
 """
 
-import time
 from typing import Any
 from agents.base import BaseAgent
+from utils.helpers import demo_sleep
 
 
 class IntelligenceAgent(BaseAgent):
@@ -35,7 +35,7 @@ class IntelligenceAgent(BaseAgent):
             f"Analyzing {len(extracted.get('action_items', []))} action items for risks and gaps",
         )
         self.add_log("🧠 Initiating intelligent analysis...")
-        time.sleep(0.3)
+        demo_sleep(context, 0.3)
 
         action_items = extracted.get("action_items", [])
         owners = extracted.get("owners", [])
@@ -43,14 +43,14 @@ class IntelligenceAgent(BaseAgent):
 
         # Perform risk analysis
         self.add_log("🔎 Scanning for missing owners...")
-        time.sleep(0.3)
+        demo_sleep(context, 0.3)
         missing_owners = [item for item in action_items if not item.get("owner")]
         if missing_owners:
             self.add_log(f"⚠️ {len(missing_owners)} tasks have NO owner assigned!")
             for item in missing_owners:
                 logger.log(
                     self.name,
-                    f"Missing owner detected: '{item['description'][:60]}...'",
+                    f"Missing owner detected: '{(item.get('description') or '')[:60]}...'",
                     f"This is a {item.get('priority', 'medium')} priority task with no owner. "
                     f"Unassigned tasks have a 73% probability of being dropped. Flagging for auto-assignment.",
                     severity="WARNING",
@@ -60,7 +60,7 @@ class IntelligenceAgent(BaseAgent):
 
         # Check for overloaded owners and historical bottlenecks
         self.add_log("📊 Analyzing team workload distribution & history...")
-        time.sleep(0.3)
+        demo_sleep(context, 0.3)
         from collections import Counter
         from utils.memory import MemoryStore
         memory = MemoryStore()
@@ -92,7 +92,7 @@ class IntelligenceAgent(BaseAgent):
 
         # Analyze dependencies
         self.add_log("🔗 Detecting task dependencies...")
-        time.sleep(0.3)
+        demo_sleep(context, 0.3)
         dependencies = self._detect_dependencies(action_items)
         if dependencies:
             self.add_log(f"🔗 Found {len(dependencies)} dependency chains")
@@ -105,7 +105,7 @@ class IntelligenceAgent(BaseAgent):
 
         # Blocker analysis
         self.add_log("🚧 Analyzing blockers and impact...")
-        time.sleep(0.3)
+        demo_sleep(context, 0.3)
         if blockers:
             self.add_log(f"🚨 {len(blockers)} active blockers detected!")
             for b in blockers:
@@ -138,7 +138,7 @@ class IntelligenceAgent(BaseAgent):
             f"Overall project risk assessed as {overall_risk}.",
         )
 
-        time.sleep(0.2)
+        demo_sleep(context, 0.2)
 
         return {
             "risks": risks,

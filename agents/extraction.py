@@ -9,9 +9,9 @@ Takes raw input text and extracts structured data:
 - Blockers and impediments
 """
 
-import time
 from typing import Any
 from agents.base import BaseAgent
+from utils.helpers import demo_sleep
 
 
 class ExtractionAgent(BaseAgent):
@@ -35,11 +35,11 @@ class ExtractionAgent(BaseAgent):
             f"Processing {len(transcript)} characters of input text using {llm.mode}",
         )
         self.add_log(f"📄 Received input ({len(transcript)} chars)")
-        time.sleep(0.3)  # Visual delay for demo
+        demo_sleep(context, 0.3)
 
         # Extract structured data from input
         self.add_log(f"🔬 Analyzing with {llm.mode}...")
-        time.sleep(0.5)
+        demo_sleep(context, 0.5)
         extracted = llm.extract_input_data(transcript)
 
         action_items = extracted.get("action_items", [])
@@ -64,7 +64,7 @@ class ExtractionAgent(BaseAgent):
             f"Summary: {summary}",
         )
 
-        time.sleep(0.2)
+        demo_sleep(context, 0.2)
 
         return {
             "action_items": action_items,

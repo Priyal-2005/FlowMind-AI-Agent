@@ -60,14 +60,44 @@ class LLMClient:
             return ""
 
     def _parse_json_from_response(self, text: str) -> Optional[dict]:
-        """Extract JSON from LLM response text."""
+        """Extract JSON object from LLM response text."""
         try:
             match = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
             if match:
-                return json.loads(match.group(1).strip())
-            return json.loads(text.strip())
-        except (json.JSONDecodeError, AttributeError):
+                parsed = json.loads(match.group(1).strip())
+                return parsed if isinstance(parsed, dict) else None
+            parsed = json.loads(text.strip())
+            return parsed if isinstance(parsed, dict) else None
+        except (json.JSONDecodeError, AttributeError, TypeError):
             return None
+
+    def _parse_json_value_from_response(self, text: str):
+        """Extract a JSON object or array from messy LLM output (fences, prose, etc.)."""
+        if not text or not str(text).strip():
+            return None
+        direct = self._parse_json_from_response(text)
+        if direct is not None:
+            return direct
+        try:
+            match = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
+            if match:
+                blob = match.group(1).strip()
+                parsed = json.loads(blob)
+                if isinstance(parsed, (dict, list)):
+                    return parsed
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            pass
+        decoder = json.JSONDecoder()
+        stripped = text.strip()
+        for i, ch in enumerate(stripped):
+            if ch in "[{":
+                try:
+                    val, _ = decoder.raw_decode(stripped[i:])
+                    if isinstance(val, (dict, list)):
+                        return val
+                except (json.JSONDecodeError, ValueError):
+                    continue
+        return None
 
     # ── EXTRACTION ─────────────────────────────────────────────
 
@@ -112,7 +142,10 @@ Return ONLY valid JSON with this exact structure:
 Input Text:
 {transcript}"""
         response = self._call_groq(prompt)
-        return self._parse_json_from_response(response) if response else None
+        if not response:
+            return None
+        parsed = self._parse_json_value_from_response(response)
+        return parsed if isinstance(parsed, dict) else None
 
     def _extract_with_rules(self, transcript: str) -> dict:
         """Rule-based extraction using patterns and keywords — guaranteed minimum output."""
@@ -333,11 +366,10 @@ Return ONLY valid JSON array:
 Workflow Data:
 {json.dumps(data, indent=2)}"""
         response = self._call_groq(prompt)
-        if response:
-            parsed = self._parse_json_from_response(response)
-            if isinstance(parsed, list):
-                return parsed
-        return None
+        if not response:
+            return None
+        parsed = self._parse_json_value_from_response(response)
+        return parsed if isinstance(parsed, list) else None
 
     def _analyze_risks_with_rules(self, data: dict) -> list:
         """Rule-based risk analysis."""
@@ -349,7 +381,7 @@ Workflow Data:
         for item in action_items:
             if not item.get("owner"):
                 risks.append({
-                    "item": item["description"],
+                    "item": item.get("description", "(no description)"),
                     "type": "missing_owner",
                     "severity": "HIGH" if item.get("priority") in ("high", "urgent") else "MEDIUM",
                     "reasoning": (
@@ -363,7 +395,7 @@ Workflow Data:
         for item in action_items:
             if not item.get("deadline"):
                 risks.append({
-                    "item": item["description"],
+                    "item": item.get("description", "(no description)"),
                     "type": "unclear_deadline",
                     "severity": "MEDIUM",
                     "reasoning": "No deadline specified. Tasks without deadlines are 2.5x more likely to slip.",
@@ -389,7 +421,7 @@ Workflow Data:
         # Add blocker risks
         for blocker in blockers:
             risks.append({
-                "item": blocker["description"],
+                "item": blocker.get("description", "(blocker)"),
                 "type": "blocker",
                 "severity": blocker.get("severity", "MEDIUM").upper(),
                 "reasoning": (
@@ -419,6 +451,12 @@ Workflow Data:
         if not self.use_llm:
             return None
 
+        try:
+            return self._decide_actions_impl(tasks, issues, context)
+        except Exception:
+            return None
+
+    def _decide_actions_impl(self, tasks: list, issues: list, context: dict) -> Optional[list]:
         prompt = f"""You are the Decision Agent in an autonomous enterprise workflow system.
 Review the following tasks and active issues, and decide the best corrective actions based on priority, risk, and team workload context.
 
@@ -445,11 +483,10 @@ Team Workload Context:
 {json.dumps(context.get('owner_workload', {}), indent=2)}
 """
         response = self._call_groq(prompt)
-        if response:
-            parsed = self._parse_json_from_response(response)
-            if isinstance(parsed, list):
-                return parsed
-        return None
+        if not response:
+            return None
+        parsed = self._parse_json_value_from_response(response)
+        return parsed if isinstance(parsed, list) else None
 
     def generate_insights(self, tasks: list, memory_stats: dict) -> str:
         """Generate high-level AI insights for the UI panel."""

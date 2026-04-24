@@ -12,10 +12,10 @@ When issues are detected, this agent TAKES ACTIONS (not suggestions):
 Every action is logged with full reasoning.
 """
 
-import time
 from typing import Any
 from copy import deepcopy
 from agents.base import BaseAgent
+from utils.helpers import demo_sleep
 
 
 # Pool of fallback assignees when no owners are identified
@@ -35,7 +35,7 @@ class DecisionAgent(BaseAgent):
     def process(self, input_data: Any, context: dict) -> dict:
         tasks = deepcopy(input_data["tasks"])
         issues = input_data.get("issues", [])
-        intelligence = input_data.get("intelligence", {})
+        intelligence = input_data.get("intelligence") or {}
         day = input_data.get("day", 1)
         llm = context.get("llm")
         logger = context["logger"]
@@ -53,7 +53,7 @@ class DecisionAgent(BaseAgent):
             f"Zero-tolerance policy for unassigned critical tasks.",
         )
         self.add_log(f"🤖 Decision Engine activated — Day {day} | {len(issues)} issues | {len(tasks)} tasks")
-        time.sleep(0.3)
+        demo_sleep(context, 0.3)
 
         actions_taken = []
         escalations = []
@@ -72,7 +72,12 @@ class DecisionAgent(BaseAgent):
 
         # ── LLM DECISION ENGINE ─────────────────────
         self.add_log("🧠 Consulting Groq Decision Model...")
-        llm_actions = llm.decide_actions(tasks, issues, intelligence) if llm else None
+        llm_actions = None
+        if llm:
+            try:
+                llm_actions = llm.decide_actions(tasks, issues, intelligence)
+            except Exception:
+                llm_actions = None
         
         if llm_actions:
             self.add_log(f"✨ AI made {len(llm_actions)} decisions. Executing dynamically...")
@@ -134,7 +139,7 @@ class DecisionAgent(BaseAgent):
                     self.add_log(f"  🔔 AI-REMINDER: {target} for {task_id}")
                     logger.log(self.name, f"AI REMINDER: {task_id} → {target}", reason, severity="ACTION")
                     
-                time.sleep(0.1)
+                demo_sleep(context, 0.1)
                 
             # Proactive assignment for stragglers that LLM might have missed
             for task in tasks:
@@ -149,8 +154,10 @@ class DecisionAgent(BaseAgent):
             
             processed_task_ids = set()
             for issue in issues:
-                issue_type = issue["type"]
-                task_id = issue["task_id"]
+                issue_type = issue.get("type")
+                task_id = issue.get("task_id")
+                if not issue_type or not task_id:
+                    continue
 
                 issue_key = f"{task_id}:{issue_type}"
                 if issue_key in processed_task_ids:
@@ -173,11 +180,15 @@ class DecisionAgent(BaseAgent):
                     if task["priority"] == "P0":
                         esc = self._escalate(task, "P0 task overdue — immediate executive attention required", logger)
                         escalations.append(esc)
-                        integrations.send_email("CTO", f"P0 Escalation: {task['title']}", esc["reasoning"])
+                        integrations.send_email(
+                            "CTO", f"P0 Escalation: {task['title']}", esc.get("reasoning") or esc.get("reason", "")
+                        )
                     elif task["priority"] == "P1" and day >= 3:
                         esc = self._escalate(task, "P1 task overdue on final day", logger)
                         escalations.append(esc)
-                        integrations.send_email("Manager", f"P1 Escalation: {task['title']}", esc["reasoning"])
+                        integrations.send_email(
+                            "Manager", f"P1 Escalation: {task['title']}", esc.get("reasoning") or esc.get("reason", "")
+                        )
 
                 elif issue_type == "delayed":
                     action = self._handle_delay(task, day, all_owners, owner_workload, logger)
@@ -193,8 +204,10 @@ class DecisionAgent(BaseAgent):
                     if task["priority"] in ("P0", "P1"):
                         esc = self._escalate(task, f"High-priority task stalled at {task.get('progress', 0)}% on Day {day}", logger)
                         escalations.append(esc)
-                        integrations.send_email("Manager", f"Stalled Escalation: {task['title']}", esc["reasoning"])
-                time.sleep(0.1)
+                        integrations.send_email(
+                            "Manager", f"Stalled Escalation: {task['title']}", esc.get("reasoning") or esc.get("reason", "")
+                        )
+                demo_sleep(context, 0.1)
 
             for owner, count in owner_workload.items():
                 if count >= 3:
@@ -408,8 +421,9 @@ class DecisionAgent(BaseAgent):
             "task_id": task["id"],
             "task_title": task["title"],
             "owner": task.get("owner", "UNASSIGNED"),
-            "priority": task["priority"],
+            "priority": task.get("priority", "P2"),
             "reason": reason,
+            "reasoning": reason,
             "action": f"Escalated to {target}: {reason}",
             "target": target,
             "icon": "🚨",

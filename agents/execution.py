@@ -10,9 +10,9 @@ structured, executable workflow tasks with proper metadata:
 - Dependency mapping
 """
 
-import time
 from typing import Any
 from agents.base import BaseAgent
+from utils.helpers import demo_sleep
 
 
 class ExecutionAgent(BaseAgent):
@@ -37,7 +37,7 @@ class ExecutionAgent(BaseAgent):
             f"with risk flags from intelligence analysis",
         )
         self.add_log("⚡ Initializing task structuring engine...")
-        time.sleep(0.3)
+        demo_sleep(context, 0.3)
 
         action_items = extracted.get("action_items", [])
         risks = intelligence.get("risks", [])
@@ -137,7 +137,7 @@ class ExecutionAgent(BaseAgent):
                 f"{'Owner is unassigned — flagged for auto-assignment.' if is_unassigned else ''}",
             )
 
-            time.sleep(0.15)
+            demo_sleep(context, 0.15)
 
         # Map dependencies from intelligence data
         deps = intelligence.get("dependencies", [])
@@ -175,7 +175,7 @@ class ExecutionAgent(BaseAgent):
             f"{'Unassigned tasks require auto-assignment.' if unassigned else 'All tasks assigned.'}",
         )
 
-        time.sleep(0.2)
+        demo_sleep(context, 0.2)
 
         return {
             "tasks": tasks,

@@ -4,14 +4,22 @@ Helper Utilities — FlowMind AI
 Provides lightweight utility functions for:
 - File input processing (PDF / TXT upload support)
 - Export functionality (JSON / CSV download)
+- Optional demo pacing (when orchestrator passes demo_mode in agent context)
 
 These are intentionally kept simple and dependency-light.
 """
 
 import csv
+import time
 import io
 import json
 from typing import Any, Union
+
+
+def demo_sleep(context: dict, seconds: float) -> None:
+    """Artificial delay for demos only; skipped when demo_mode is false."""
+    if context.get("demo_mode"):
+        time.sleep(seconds)
 
 
 # ── FILE INPUT SUPPORT ──────────────────────────────────────

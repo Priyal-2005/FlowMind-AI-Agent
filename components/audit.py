@@ -92,36 +92,3 @@ def render_audit_trail(audit_logger: AuditLogger):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-
-def render_audit_summary(audit_logger: AuditLogger):
-    """Render a compact audit summary with key stats."""
-    entries = audit_logger.get_entries()
-    if not entries:
-        return
-
-    actions = audit_logger.get_autonomous_actions()
-    escalations = audit_logger.get_escalations()
-    warnings = audit_logger.get_actions_by_severity("WARNING")
-
-    cols = st.columns(4)
-    with cols[0]:
-        st.metric("Total Logs", len(entries))
-    with cols[1]:
-        st.metric("Actions Taken", len(actions))
-    with cols[2]:
-        st.metric("Escalations", len(escalations))
-    with cols[3]:
-        st.metric("Warnings", len(warnings))
-
-
-def _get_agent_class(agent_name: str) -> str:
-    """Map agent name to CSS class."""
-    mapping = {
-        "Orchestrator": "audit-orchestrator",
-        "Extraction Agent": "audit-extraction",
-        "Intelligence Agent": "audit-intelligence",
-        "Execution Agent": "audit-execution",
-        "Tracking Agent": "audit-tracking",
-        "Decision Agent": "audit-decision",
-    }
-    return mapping.get(agent_name, "")

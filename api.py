@@ -5,9 +5,12 @@ Enterprise REST API for programmatic access to the
 multi-agent workflow orchestration pipeline.
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from orchestrator import WorkflowOrchestrator
+from orchestrator.orchestrator import WorkflowOrchestrator
 from utils.memory import MemoryStore
 
 app = FastAPI(

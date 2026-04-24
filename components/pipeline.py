@@ -6,7 +6,6 @@ animated transitions, and real-time execution logs.
 """
 
 import streamlit as st
-from utils.logger import AuditLogger
 
 
 def render_pipeline(agents: list, current_agent: str = None):

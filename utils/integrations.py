@@ -1,3 +1,11 @@
+"""
+Mock Integrations — Slack & Email Simulation
+
+Simulates external service integrations (Slack, Email) for
+the autonomous decision engine. Actions are logged to the
+audit trail and shown as Streamlit toasts in the UI.
+"""
+
 import streamlit as st
 
 class MockIntegrations:

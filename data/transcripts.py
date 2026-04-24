@@ -125,23 +125,13 @@ Raj: Let's flag those and figure it out. We can't let anything fall through the 
     },
 }
 
-# Backward compatibility alias
-TRANSCRIPTS = SAMPLE_INPUTS
-
 
 def get_input_names() -> list:
     """Return list of available input names."""
     return list(SAMPLE_INPUTS.keys())
 
 
-# Backward compatibility alias
-get_transcript_names = get_input_names
-
-
 def get_input(name: str) -> dict:
     """Get a specific input by name."""
     return SAMPLE_INPUTS.get(name, {})
 
-
-# Backward compatibility alias
-get_transcript = get_input

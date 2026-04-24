@@ -10,7 +10,7 @@ import streamlit as st
 from dotenv import load_dotenv
 load_dotenv()
 
-from orchestrator import WorkflowOrchestrator
+from orchestrator.orchestrator import WorkflowOrchestrator
 from data.transcripts import SAMPLE_INPUTS, get_input_names
 from components.styles import get_main_styles
 from components.pipeline import render_pipeline, render_agent_logs

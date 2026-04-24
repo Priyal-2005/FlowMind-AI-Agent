@@ -10,7 +10,7 @@ The brain of the FlowMind AI multi-agent system. Manages:
 """
 
 import time
-from typing import Optional, Generator
+from typing import Optional
 from copy import deepcopy
 
 from dotenv import load_dotenv

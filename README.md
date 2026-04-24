@@ -9,10 +9,6 @@
   <img src="https://img.shields.io/badge/Groq-LLM-optional-F55036?style=flat-square" alt="Groq" />
 </p>
 
-**Demo GIF (placeholder)** — Add a screen recording as `docs/demo.gif`, then uncomment:
-
-`![FlowMind demo](docs/demo.gif)`
-
 ---
 
 ## Why FlowMind?
@@ -37,6 +33,38 @@
 - **FastAPI** — `POST /api/v1/orchestrate` for headless runs
 - **Streamlit SaaS-style UI** — Dark theme, metrics, task cards, actions panel, exports
 
+### Feature Description
+
+🔍 Intelligent Extraction	
+AI-powered parsing of unstructured text into action items, decisions, owners, and deadlines
+
+🧠 Risk Intelligence
+Detects missing owners, overloaded team members, blockers, and dependency chains
+
+⚡ Task Automation
+Converts raw data into structured tasks with P0/P1/P2 priorities and risk flags
+
+📊 Time Simulation	
+Deterministic Day 1→3 progression with bottleneck detection
+
+🤖 Autonomous Decisions	
+Auto-assigns unowned tasks, escalates delays, sends reminders, redistributes workload
+
+📜 Full Audit Trail
+Every agent action logged with timestamps and reasoning
+
+📎 File Input Support
+Upload PDF or TXT files as workflow input
+
+📥 Export Results
+Download results as JSON or CSV
+
+💾 Persistent Memory
+Historical owner performance tracking for predictive analysis
+
+🔮 Predictive Delays
+Forecasts which tasks will be delayed based on historical patterns
+
 ---
 
 ## Architecture
@@ -49,7 +77,7 @@
                                         │
     ┌───────────┬───────────┬───────────┼───────────┬───────────┐
     ▼           ▼           ▼           ▼           ▼           │
- Extraction  Intelligence Execution  Tracking   Decision      │
+ Extraction  Intelligence Execution  Tracking   Decision        │
     │           │           │           │           │           │
     └───────────┴───────────┴───────────┴───────────┴───────────┘
                         │
@@ -57,6 +85,17 @@
               ▼                   ▼
         utils/llm.py        utils/memory.py
      (Groq + fallback)     (JSON persistence)
+```
+
+```
+┌──────────────┐     ┌──────────────────┐     ┌───────────────┐     ┌──────────────┐     ┌──────────────┐
+│  Extraction  │ ──▶ │  Intelligence    │ ──▶ │  Execution    │ ──▶ │  Tracking    │ ──▶ │  Decision    │
+│    Agent     │     │     Agent        │     │    Agent      │     │    Agent     │     │    Agent     │
+│              │     │                  │     │               │     │              │     │              │
+│  🔍 Parse    │      │  🧠 Risks &      │     │ ⚡ Create      │     │  📊 Simulate │     │  🤖 Auto-    │
+│  input text  │     │  dependencies    │     │  tasks        │     │  Day 1→3     │     │  assign,     │
+│              │     │                  │     │               │     │              │     │  escalate    │
+└──────────────┘     └──────────────────┘     └───────────────┘     └──────────────┘     └──────────────┘
 ```
 
 ---
@@ -76,7 +115,7 @@
 ## Repository layout
 
 ```
-flowmind-ai/
+flowmind-ai-agent/
 ├── agents/              # Five pipeline agents + BaseAgent
 ├── orchestrator/        # WorkflowOrchestrator
 ├── utils/               # llm, memory, logger, helpers, integrations
@@ -89,7 +128,6 @@ flowmind-ai/
 ├── README.md
 ├── .env.example
 ├── .streamlit/config.toml
-└── docs/                # Optional demo.gif (see docs/README.md)
 ```
 
 ---
@@ -192,6 +230,5 @@ Pin your public app URL here after deploy (for example Streamlit Cloud): `https:
 
 ---
 
-## License / credits
-
-Built as a portfolio-grade **multi-agent workflow** demo: clear separation of agents, orchestrator, LLM layer, memory, API, and UI. Customize transcripts in `data/transcripts.py` and styling in `components/styles.py`.
+# Deployed Link
+https://flowmind-ai-agent-autonomous-workflow-orchestrator.streamlit.app/

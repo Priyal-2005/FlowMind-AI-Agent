@@ -1,9 +1,9 @@
 """
-Extraction Agent — Meeting Transcript Parser
+Extraction Agent — Input Data Parser
 
-Takes raw meeting transcript text and extracts structured data:
+Takes raw input text and extracts structured data:
 - Action items with owners and deadlines
-- Decisions made during the meeting
+- Decisions identified in the input
 - Participants/owners mentioned
 - Deadlines and timeframes
 - Blockers and impediments
@@ -15,13 +15,13 @@ from agents.base import BaseAgent
 
 
 class ExtractionAgent(BaseAgent):
-    """Parses meeting transcripts into structured actionable data."""
+    """Parses input text into structured actionable data."""
 
     def __init__(self):
         super().__init__(
             name="Extraction Agent",
             icon="🔍",
-            description="Parses meeting transcript to extract action items, decisions, owners, deadlines, and blockers",
+            description="Parses input text to extract action items, decisions, owners, deadlines, and blockers",
         )
 
     def process(self, input_data: Any, context: dict) -> dict:
@@ -31,16 +31,16 @@ class ExtractionAgent(BaseAgent):
 
         logger.log(
             self.name,
-            "Starting transcript analysis",
-            f"Processing {len(transcript)} characters of meeting transcript using {llm.mode}",
+            "Starting input analysis",
+            f"Processing {len(transcript)} characters of input text using {llm.mode}",
         )
-        self.add_log(f"📄 Received transcript ({len(transcript)} chars)")
+        self.add_log(f"📄 Received input ({len(transcript)} chars)")
         time.sleep(0.3)  # Visual delay for demo
 
-        # Extract meeting data
+        # Extract structured data from input
         self.add_log(f"🔬 Analyzing with {llm.mode}...")
         time.sleep(0.5)
-        extracted = llm.extract_meeting_data(transcript)
+        extracted = llm.extract_input_data(transcript)
 
         action_items = extracted.get("action_items", [])
         decisions = extracted.get("decisions", [])

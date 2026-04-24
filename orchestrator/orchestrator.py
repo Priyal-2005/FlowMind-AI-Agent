@@ -1,7 +1,7 @@
 """
 Orchestrator Agent — Central Workflow Controller
 
-The brain of the multi-agent system. Manages:
+The brain of the FlowMind AI multi-agent system. Manages:
 - Global state across all agents
 - Pipeline routing (Extraction → Intelligence → Execution → Tracking → Decision)
 - Step-by-step execution with UI callback support
@@ -25,8 +25,8 @@ from agents.tracking import TrackingAgent
 from agents.decision import DecisionAgent
 
 
-class MeetingOrchestrator:
-    """Central orchestrator for the autonomous meeting workflow system."""
+class WorkflowOrchestrator:
+    """Central orchestrator for the FlowMind AI autonomous workflow system."""
 
     def __init__(self):
         self.llm = LLMClient()
@@ -91,35 +91,37 @@ class MeetingOrchestrator:
             "tasks": [],
         }
 
-    def run_pipeline(self, transcript: str) -> dict:
+    def run_pipeline(self, input_text: str) -> dict:
         """
         Execute the full agent pipeline synchronously.
         Returns complete state after all agents have executed.
         """
         self.reset()
-        self.state["transcript"] = transcript
+        self.state["transcript"] = input_text
         self.state["pipeline_status"] = "running"
 
         ctx = self.get_context()
 
         self.audit_logger.log(
             "Orchestrator",
-            "Pipeline initiated — Processing meeting transcript",
+            "Pipeline initiated — Processing workflow input",
             f"Starting autonomous workflow pipeline with {len(self.agents)} agents. "
-            f"LLM mode: {self.llm.mode}. Transcript length: {len(transcript)} chars.",
+            f"LLM mode: {self.llm.mode}. Input length: {len(input_text)} chars.",
         )
 
         try:
-            # Step 1: Extraction
+            # ── Stage 1: Extraction ──────────────────────
+            # Parse raw input text into structured data
             self.state["current_agent"] = "extraction"
             self.audit_logger.log(
                 "Orchestrator",
                 "Routing to Extraction Agent",
-                "First stage: Parse raw transcript into structured data",
+                "First stage: Parse raw input into structured data",
             )
-            self.state["extracted"] = self.agents["extraction"].execute(transcript, ctx)
+            self.state["extracted"] = self.agents["extraction"].execute(input_text, ctx)
 
-            # Step 2: Intelligence
+            # ── Stage 2: Intelligence ────────────────────
+            # Analyze extracted data for risks and gaps
             self.state["current_agent"] = "intelligence"
             self.audit_logger.log(
                 "Orchestrator",
@@ -130,7 +132,8 @@ class MeetingOrchestrator:
                 self.state["extracted"], ctx
             )
 
-            # Step 3: Execution
+            # ── Stage 3: Execution ───────────────────────
+            # Create structured executable tasks
             self.state["current_agent"] = "execution"
             self.audit_logger.log(
                 "Orchestrator",
@@ -152,7 +155,8 @@ class MeetingOrchestrator:
                 else None
             ) or self.state["tasks"]
 
-            # Step 4: Tracking (Day 1 by default)
+            # ── Stage 4: Tracking (Day 1 by default) ─────
+            # Simulate Day 1 task progression
             self.state["current_agent"] = "tracking"
             self.audit_logger.log(
                 "Orchestrator",
@@ -172,7 +176,8 @@ class MeetingOrchestrator:
             ) or self.state["tasks"]
             self.state["current_day"] = 1
 
-            # Step 5: Decision
+            # ── Stage 5: Decision ────────────────────────
+            # Take autonomous corrective actions
             self.state["current_agent"] = "decision"
             self.audit_logger.log(
                 "Orchestrator",
@@ -200,7 +205,7 @@ class MeetingOrchestrator:
                 or self.state["tasks"]
             )
 
-            # Complete
+            # ── Pipeline Complete ────────────────────────
             self.state["pipeline_status"] = "complete"
             self.state["current_agent"] = None
 

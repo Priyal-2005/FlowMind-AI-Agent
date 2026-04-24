@@ -1,3 +1,11 @@
+"""
+Memory Store — Persistent Historical Context
+
+Lightweight JSON-based persistence layer for FlowMind AI.
+Tracks task outcomes and owner performance metrics across runs
+to enable predictive delay analysis and intelligent workload balancing.
+"""
+
 import json
 import os
 from typing import Dict, List, Any

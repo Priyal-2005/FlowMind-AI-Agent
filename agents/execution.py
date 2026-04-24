@@ -2,7 +2,7 @@
 Execution Agent — Task Structuring Engine
 
 Takes extracted items and intelligence analysis to create
-structured, executable tasks with proper metadata:
+structured, executable workflow tasks with proper metadata:
 - Unique task IDs
 - Priority classification (P0/P1/P2)
 - Status tracking

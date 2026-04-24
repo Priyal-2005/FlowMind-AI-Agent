@@ -151,7 +151,7 @@ def render_task_table(tasks: list):
             task_id = h(task.get("id", ""))
             title = h(task.get("title", ""))
             if task.get("ai_decision"):
-                 title += ' <span style="font-size: 0.65rem; color: #6C63FF; border: 1px solid rgba(108, 99, 255, 0.4); background: rgba(108, 99, 255, 0.1); padding: 1px 4px; border-radius: 4px; margin-left: 5px;">🤖 Gemini</span>'
+                 title += ' <span style="font-size: 0.65rem; color: #6C63FF; border: 1px solid rgba(108, 99, 255, 0.4); background: rgba(108, 99, 255, 0.1); padding: 1px 4px; border-radius: 4px; margin-left: 5px;">🤖 Groq</span>'
             deadline = h(task.get("deadline", "—"))
 
             # Render columns

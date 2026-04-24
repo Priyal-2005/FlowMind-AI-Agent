@@ -1,26 +1,33 @@
+"""
+FlowMind AI — API Endpoints
+
+Enterprise REST API for programmatic access to the
+multi-agent workflow orchestration pipeline.
+"""
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from orchestrator import MeetingOrchestrator
+from orchestrator import WorkflowOrchestrator
 from utils.memory import MemoryStore
 
 app = FastAPI(
-    title="Meeting Orchestrator AI Command Center API",
-    description="Enterprise endpoints for extracting, tracking, and actioning meeting items autonomously.",
+    title="FlowMind AI — Autonomous Workflow Orchestrator API",
+    description="Enterprise endpoints for extracting, tracking, and actioning workflow items autonomously.",
     version="2.0.0"
 )
 
-class TranscriptInput(BaseModel):
-    transcript: str
+class WorkflowInput(BaseModel):
+    input_text: str
 
 @app.post("/api/v1/orchestrate", tags=["Core Pipeline"])
-def run_orchestrator(input_data: TranscriptInput):
+def run_orchestrator(input_data: WorkflowInput):
     """
     Execute the entire 5-stage multi-agent pipeline immediately:
     Extraction -> Intelligence -> Execution -> Tracking -> Decision.
     """
     try:
-        orch = MeetingOrchestrator()
-        state = orch.run_pipeline(input_data.transcript)
+        orch = WorkflowOrchestrator()
+        state = orch.run_pipeline(input_data.input_text)
         
         if state["pipeline_status"] == "error":
             raise HTTPException(status_code=500, detail="Agent pipeline encountered an error.")

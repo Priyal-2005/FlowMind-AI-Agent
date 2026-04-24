@@ -1,8 +1,8 @@
 """
-LLM Integration Layer — Google Gemini + Rule-Based Fallback
+LLM Integration Layer — Groq + Rule-Based Fallback
 
-Provides intelligent extraction and analysis capabilities.
-Uses Gemini API when available, falls back to rule-based NLP otherwise.
+Provides intelligent extraction and analysis capabilities for FlowMind AI.
+Uses Groq API when available, falls back to rule-based NLP otherwise.
 """
 
 import json
@@ -10,53 +10,53 @@ import os
 import re
 from typing import Optional
 
-import warnings
 try:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        import google.generativeai as genai
-    GEMINI_AVAILABLE = True
+    from groq import Groq
+    GROQ_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
+    GROQ_AVAILABLE = False
 
 
 class LLMClient:
     """Unified LLM client with automatic fallback to rule-based extraction."""
 
-    def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY", "")
-        self.use_llm = False
-        self.model = None
+    MODEL_NAME = "llama-3.3-70b-versatile"
 
-        if GEMINI_AVAILABLE and self.api_key and self.api_key != "your_api_key_here":
+    def __init__(self):
+        self.api_key = os.getenv("GROQ_API_KEY", "")
+        self.use_llm = False
+        self.client = None
+
+        if GROQ_AVAILABLE and self.api_key and self.api_key != "your_api_key_here":
             try:
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel("gemini-2.0-flash")
+                self.client = Groq(api_key=self.api_key)
                 self.use_llm = True
             except Exception:
                 self.use_llm = False
 
     @property
     def mode(self) -> str:
-        return "🤖 Gemini AI" if self.use_llm else "⚙️ Smart Extraction Engine"
+        return "🤖 Groq AI" if self.use_llm else "⚙️ Smart Extraction Engine"
 
     # ── LLM CALLS ──────────────────────────────────────────────
 
-    def _call_gemini(self, prompt: str) -> str:
-        """Call Gemini API with error handling."""
-        if not self.use_llm or not self.model:
+    def _call_groq(self, prompt: str) -> str:
+        """Call Groq API with error handling."""
+        if not self.use_llm or not self.client:
             return ""
         try:
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.2,
-                    max_output_tokens=4096,
-                ),
+            chat_completion = self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "You are an expert AI assistant for enterprise workflow management. Follow instructions precisely and return structured data as requested."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=self.MODEL_NAME,
+                temperature=0.2,
+                max_tokens=4096,
             )
-            return response.text
+            return chat_completion.choices[0].message.content
         except Exception as e:
-            print(f"Gemini API error: {e}")
+            print(f"Groq API error: {e}")
             return ""
 
     def _parse_json_from_response(self, text: str) -> Optional[dict]:
@@ -71,16 +71,19 @@ class LLMClient:
 
     # ── EXTRACTION ─────────────────────────────────────────────
 
-    def extract_meeting_data(self, transcript: str) -> dict:
-        """Extract structured data from meeting transcript."""
+    def extract_input_data(self, transcript: str) -> dict:
+        """Extract structured data from input text."""
         if self.use_llm:
             result = self._extract_with_llm(transcript)
             if result:
                 return result
         return self._extract_with_rules(transcript)
 
+    # Backward compatibility alias
+    extract_meeting_data = extract_input_data
+
     def _extract_with_llm(self, transcript: str) -> Optional[dict]:
-        prompt = f"""Analyze this meeting transcript and extract structured data.
+        prompt = f"""Analyze this input text and extract structured data.
 Return ONLY valid JSON with this exact structure:
 ```json
 {{
@@ -106,9 +109,9 @@ Return ONLY valid JSON with this exact structure:
 }}
 ```
 
-Meeting Transcript:
+Input Text:
 {transcript}"""
-        response = self._call_gemini(prompt)
+        response = self._call_groq(prompt)
         return self._parse_json_from_response(response) if response else None
 
     def _extract_with_rules(self, transcript: str) -> dict:
@@ -288,7 +291,7 @@ Meeting Transcript:
                 deadlines.append(m.group(1).strip())
 
         # ── Summary ────────────────────────────────────────
-        summary = f"Meeting with {len(owners)} participant(s) discussing {len(action_items)} action items."
+        summary = f"Input processed with {len(owners)} participant(s) and {len(action_items)} action items identified."
         if blockers:
             summary += f" {len(blockers)} blocker(s) identified requiring immediate attention."
         if decisions:
@@ -306,7 +309,7 @@ Meeting Transcript:
     # ── RISK ANALYSIS ──────────────────────────────────────────
 
     def analyze_risks(self, extracted_data: dict) -> list:
-        """Analyze risks in extracted meeting data."""
+        """Analyze risks in extracted input data."""
         if self.use_llm:
             result = self._analyze_risks_with_llm(extracted_data)
             if result:
@@ -314,7 +317,7 @@ Meeting Transcript:
         return self._analyze_risks_with_rules(extracted_data)
 
     def _analyze_risks_with_llm(self, data: dict) -> Optional[list]:
-        prompt = f"""Analyze these meeting action items for risks and issues.
+        prompt = f"""Analyze these workflow action items for risks and issues.
 Return ONLY valid JSON array:
 ```json
 [
@@ -327,9 +330,9 @@ Return ONLY valid JSON array:
 ]
 ```
 
-Meeting Data:
+Workflow Data:
 {json.dumps(data, indent=2)}"""
-        response = self._call_gemini(prompt)
+        response = self._call_groq(prompt)
         if response:
             parsed = self._parse_json_from_response(response)
             if isinstance(parsed, list):
@@ -412,7 +415,7 @@ Meeting Data:
     # ── DECISION ACTIONS (PHASE 2) ─────────────────────────────
 
     def decide_actions(self, tasks: list, issues: list, context: dict) -> Optional[list]:
-        """Dynamically decide actions for current issues using Gemini."""
+        """Dynamically decide actions for current issues using Groq LLM."""
         if not self.use_llm:
             return None
 
@@ -441,7 +444,7 @@ Issues detected:
 Team Workload Context:
 {json.dumps(context.get('owner_workload', {}), indent=2)}
 """
-        response = self._call_gemini(prompt)
+        response = self._call_groq(prompt)
         if response:
             parsed = self._parse_json_from_response(response)
             if isinstance(parsed, list):
@@ -451,7 +454,7 @@ Team Workload Context:
     def generate_insights(self, tasks: list, memory_stats: dict) -> str:
         """Generate high-level AI insights for the UI panel."""
         if not self.use_llm:
-            return "AI Insights require Gemini API access. Please configure your API key."
+            return "AI Insights require Groq API access. Please configure your GROQ_API_KEY."
 
         prompt = f"""You are an elite project management AI. Based on the current tasks and historical team memory stats, generate a concise, 3-bullet-point summary of key insights. Highlight overloaded employees, highest risk tasks, and suggested optimizations. Do not use markdown headers, just return a bulleted list.
 
@@ -461,7 +464,7 @@ Current Tasks (state):
 Team Memory / Performance Stats:
 {json.dumps(memory_stats, indent=2)}
 """
-        response = self._call_gemini(prompt)
+        response = self._call_groq(prompt)
         return response.strip() if response else "Insight generation failed."
 
     # ── REASONING GENERATION ───────────────────────────────────
@@ -473,7 +476,7 @@ Team Memory / Performance Stats:
 Given this context: {context}
 You took this action: {action}
 Explain your reasoning in 1-2 sentences. Be specific and data-driven."""
-            response = self._call_gemini(prompt)
+            response = self._call_groq(prompt)
             if response:
                 return response.strip()
         # Fallback: return the action itself as reasoning

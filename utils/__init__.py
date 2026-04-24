@@ -1,1 +1,1 @@
-"""Utility modules for the Autonomous Meeting Orchestrator."""
+"""Utility modules for FlowMind AI — Autonomous Workflow Orchestrator."""

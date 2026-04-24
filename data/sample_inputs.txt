@@ -1,0 +1,76 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# FlowMind AI — Sample Workflow Inputs
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# These sample inputs demonstrate different workflow scenarios
+# that the FlowMind AI multi-agent system can process.
+#
+# Usage:
+#   - Paste any of these into the text input area, OR
+#   - Select from the built-in dropdown in the sidebar
+#   - Upload your own .txt or .pdf file
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+── SAMPLE 1: Sprint Planning (Simple) ──────────────────────
+
+Sprint Planning — Engineering Team
+Date: Monday Morning
+Participants: Raj, Sarah, Mike, Priya
+
+Raj: Alright team, let's plan this sprint. We have the dashboard redesign, API optimization, and the new authentication module to handle.
+
+Sarah: I'll take the dashboard redesign. I've already done the wireframes and I can have the frontend components ready by end of Day 2. I'll use the new design system we agreed on last week.
+
+Raj: Perfect. Make sure to include the dark mode toggle — product really wants that. Mike, how about the API optimization?
+
+Mike: I'll handle the API optimization. The response times are currently at 800ms, we need to bring them under 200ms. I should be able to finish the database query optimization by Day 1, and the caching layer by Day 2.
+
+Raj: Great. What about the authentication module?
+
+Priya: I'll work on the authentication module. I need to implement OAuth2 with Google and GitHub providers. I'll have the Google integration done by Day 1 and GitHub by Day 2. Full testing by Day 3.
+
+Raj: Excellent. I'll handle the deployment pipeline updates and the CI/CD configuration. Should be done by Day 2.
+
+Sarah: One thing — we decided to go with React Server Components for the dashboard instead of client-side rendering. That's a firm decision from the architecture review.
+
+Raj: Confirmed. Also, we agreed to deprecate the v1 API endpoints by end of this sprint. Mike, make sure the migration guide is updated.
+
+Mike: Will do. I'll update the API documentation as part of my task.
+
+Raj: Alright, let's execute. Daily standups at 9 AM. Any blockers, flag them immediately.
+
+
+── SAMPLE 2: Crisis Response (Missing Owners) ─────────────
+
+Emergency Response — System Outage
+Date: Thursday, 2:00 PM (Urgent)
+Participants: Raj, Sarah, Mike, Priya
+
+Raj: Everyone, we have a critical situation. The production system went down 30 minutes ago. Customer complaints are flooding in. We need to move fast.
+
+Mike: I've identified the issue — the database connection pool is exhausted. We need to increase the pool size and restart the services immediately.
+
+Raj: Mike, handle the immediate database fix right now. This is P0, must be done today.
+
+Sarah: The frontend is showing 502 errors to users. Someone needs to put up a maintenance page while Mike fixes the backend.
+
+Raj: Good call. Sarah, can you handle the maintenance page?
+
+Sarah: I'm already on three other things but yes, I'll do it right now.
+
+Priya: We also need to send a customer communication email about the outage. Our SLA requires notification within 1 hour.
+
+Raj: Absolutely critical. Someone needs to draft that email immediately.
+
+Mike: After the immediate fix, we need a root cause analysis document. The post-mortem should cover why the connection pool wasn't monitored.
+
+Raj: Agreed. We also need to set up monitoring alerts so this doesn't happen again. We should implement automated scaling for the connection pool.
+
+Priya: One more thing — the backup system hasn't been tested in months. We need to verify our disaster recovery plan is actually functional. This is urgent but nobody has time for it right now.
+
+Raj: We decided that all production deployments will require a pre-deployment checklist going forward. Also, we're implementing mandatory service health checks before any release.
+
+Mike: The database fix is my top priority. But the monitoring setup, the scaling implementation, and the runbook update — those need owners. Right now they're just floating.
+
+Raj: Let's flag those and figure it out. We can't let anything fall through the cracks on this. Every minute of downtime costs us $5,000.

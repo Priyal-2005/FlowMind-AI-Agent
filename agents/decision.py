@@ -38,6 +38,7 @@ class DecisionAgent(BaseAgent):
         intelligence = input_data.get("intelligence", {})
         day = input_data.get("day", 1)
         llm = context.get("llm")
+        logger = context["logger"]
         
         from utils.memory import MemoryStore
         from utils.integrations import MockIntegrations
@@ -70,7 +71,7 @@ class DecisionAgent(BaseAgent):
             all_owners = FALLBACK_TEAM[:3]
 
         # ── LLM DECISION ENGINE ─────────────────────
-        self.add_log("🧠 Consulting Gemini Decision Model...")
+        self.add_log("🧠 Consulting Groq Decision Model...")
         llm_actions = llm.decide_actions(tasks, issues, intelligence) if llm else None
         
         if llm_actions:
@@ -144,7 +145,7 @@ class DecisionAgent(BaseAgent):
                         integrations.send_slack_message(task["owner"], f"Fallback Auto-assignment: {task['title']}")
 
         else:
-            self.add_log("⚙️ Gemini unavailable or declined. Using deterministic fallback engine...")
+            self.add_log("⚙️ Groq unavailable or declined. Using deterministic fallback engine...")
             
             processed_task_ids = set()
             for issue in issues:

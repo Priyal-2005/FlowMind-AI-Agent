@@ -1,7 +1,7 @@
 """
 Intelligence Agent — Risk & Dependency Analyzer
 
-Analyzes extracted meeting data to detect:
+Analyzes extracted input data to detect:
 - Missing owners (unassigned tasks)
 - Task dependencies
 - Active blockers and their impact

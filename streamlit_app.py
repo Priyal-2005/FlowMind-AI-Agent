@@ -1,17 +1,17 @@
 """
-Autonomous Meeting → Action Orchestrator
+FlowMind AI — Autonomous Workflow Orchestrator
 Enterprise Command Center Dashboard
 
 Main Streamlit application that orchestrates the multi-agent
-AI system for meeting intelligence and autonomous workflow management.
+AI system for workflow intelligence and autonomous task management.
 """
 
 import streamlit as st
 from dotenv import load_dotenv
 load_dotenv()
 
-from orchestrator import MeetingOrchestrator
-from data.transcripts import TRANSCRIPTS, get_transcript_names
+from orchestrator import WorkflowOrchestrator
+from data.transcripts import SAMPLE_INPUTS, get_input_names
 from components.styles import get_main_styles
 from components.pipeline import render_pipeline, render_agent_logs
 from components.dashboard import (
@@ -23,11 +23,12 @@ from components.dashboard import (
     render_summary_banner,
 )
 from components.audit import render_audit_trail
+from utils.helpers import extract_text_from_file, export_to_json, export_to_csv
 
 # ── PAGE CONFIG ──────────────────────────────────────
 st.set_page_config(
-    page_title="Meeting Orchestrator — AI Command Center",
-    page_icon="🎯",
+    page_title="FlowMind AI — Autonomous Workflow Orchestrator",
+    page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -37,26 +38,26 @@ st.markdown(get_main_styles(), unsafe_allow_html=True)
 
 # ── SESSION STATE INIT ───────────────────────────────
 if "orchestrator" not in st.session_state:
-    st.session_state.orchestrator = MeetingOrchestrator()
+    st.session_state.orchestrator = WorkflowOrchestrator()
 if "pipeline_ran" not in st.session_state:
     st.session_state.pipeline_ran = False
 if "current_day" not in st.session_state:
     st.session_state.current_day = 1
 if "selected_transcript" not in st.session_state:
-    st.session_state.selected_transcript = get_transcript_names()[0]
+    st.session_state.selected_transcript = get_input_names()[0]
 
 
 # ── SIDEBAR ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
     <div style="text-align: center; padding: 1rem 0 0.5rem 0;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.3rem;">🎯</div>
+        <div style="font-size: 2.5rem; margin-bottom: 0.3rem;">🧠</div>
         <div style="font-size: 1.1rem; font-weight: 700; 
              background: linear-gradient(135deg, #00D4AA, #6C63FF);
              -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-             background-clip: text;">Meeting Orchestrator</div>
+             background-clip: text;">FlowMind AI</div>
         <div style="font-size: 0.7rem; color: #8B8FA3; margin-top: 0.2rem;">
-            Autonomous AI Command Center
+            Autonomous Workflow Orchestrator
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -71,32 +72,52 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # Transcript Selection
-    st.markdown("### 📄 Meeting Transcript")
+    # Input Selection
+    st.markdown("### 📄 Workflow Input")
 
     transcript_name = st.selectbox(
-        "Select a sample transcript",
-        get_transcript_names(),
+        "Select a sample input",
+        get_input_names(),
         key="transcript_selector",
         label_visibility="collapsed",
     )
     st.session_state.selected_transcript = transcript_name
 
-    selected = TRANSCRIPTS[transcript_name]
+    selected = SAMPLE_INPUTS[transcript_name]
     st.caption(f"{selected['icon']} {selected['description']}")
 
-    # Show transcript
+    # Show input text
     transcript_text = st.text_area(
-        "Meeting Transcript",
+        "Workflow Input",
         value=selected["transcript"].strip(),
-        height=250,
+        height=200,
         key="transcript_input",
         label_visibility="collapsed",
     )
 
+    # ── FILE UPLOAD ──────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 📎 Upload Input File")
+    uploaded_file = st.file_uploader(
+        "Upload a TXT or PDF file",
+        type=["txt", "pdf"],
+        key="file_uploader",
+        label_visibility="collapsed",
+        help="Upload a .txt or .pdf file to use as workflow input instead of the text area above.",
+    )
+    if uploaded_file is not None:
+        extracted_text = extract_text_from_file(uploaded_file)
+        if extracted_text and not extracted_text.startswith("[Error]"):
+            transcript_text = extracted_text
+            st.success(f"✅ Loaded {len(extracted_text)} chars from {uploaded_file.name}")
+        elif extracted_text.startswith("[Error]"):
+            st.error(extracted_text)
+        else:
+            st.warning("⚠️ Could not extract text from the uploaded file.")
+
     st.markdown("---")
 
-    # Memory System (Phase 2)
+    # Memory System
     st.markdown("### 💾 Persistence")
     wipe_clicked = st.button(
         "🗑️ Wipe Database",
@@ -120,7 +141,7 @@ with st.sidebar:
         use_container_width=True,
         type="secondary",
         key="demo_mode",
-        help="Loads the Crisis Response transcript and runs the pipeline automatically",
+        help="Loads the Crisis Response input and runs the pipeline automatically",
     )
 
     # Run button
@@ -132,9 +153,9 @@ with st.sidebar:
     )
 
     if demo_clicked:
-        # Switch to crisis transcript
+        # Switch to crisis input
         crisis_name = "Crisis Response — Missing Owners"
-        if crisis_name in TRANSCRIPTS:
+        if crisis_name in SAMPLE_INPUTS:
             st.session_state.selected_transcript = crisis_name
             # Flag that we should auto-run
             st.session_state.auto_run = True
@@ -151,7 +172,7 @@ with st.sidebar:
     with st.expander("View Agents", expanded=False):
         agents_info = [
             ("🎯", "Orchestrator", "Central control & routing"),
-            ("🔍", "Extraction", "Parse transcript data"),
+            ("🔍", "Extraction", "Parse input data"),
             ("🧠", "Intelligence", "Risk & gap analysis"),
             ("⚡", "Execution", "Task structuring"),
             ("📊", "Tracking", "Time simulation"),
@@ -184,8 +205,8 @@ with st.sidebar:
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>🎯 Autonomous Meeting Orchestrator</h1>
-    <div class="subtitle">Multi-Agent AI Command Center for Enterprise Workflow Intelligence</div>
+    <h1>🧠 FlowMind AI</h1>
+    <div class="subtitle">Multi-Agent Autonomous Workflow Orchestrator</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -195,13 +216,13 @@ if run_clicked and transcript_text.strip():
     # Reset state
     st.session_state.pipeline_ran = False
     st.session_state.current_day = 1
-    new_orch = MeetingOrchestrator()
+    new_orch = WorkflowOrchestrator()
     st.session_state.orchestrator = new_orch
 
     import time
-    with st.status("🎯 Orchestrator initializing pipeline...", expanded=True) as status:
+    with st.status("🧠 FlowMind AI initializing pipeline...", expanded=True) as status:
         stages = [
-            "🔍 Extraction Agent — Parsing transcript...",
+            "🔍 Extraction Agent — Parsing input...",
             "🧠 Intelligence Agent — Analyzing risks...",
             "⚡ Execution Agent — Creating tasks...",
             "📊 Tracking Agent — Simulating Day 1...",
@@ -252,6 +273,35 @@ if st.session_state.pipeline_ran and orch.state.get("pipeline_status") in ("comp
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # ── EXPORT BUTTONS ──────────────────────────────
+    export_col1, export_col2, export_col3 = st.columns([1, 1, 4])
+    with export_col1:
+        json_data = export_to_json({
+            "pipeline_status": state.get("pipeline_status"),
+            "tasks": tasks,
+            "intelligence": state.get("intelligence"),
+            "decision": decision,
+            "tracking": {k: v for k, v in tracking.items() if k != "day_snapshots"},
+        })
+        st.download_button(
+            label="📥 Export JSON",
+            data=json_data,
+            file_name="flowmind_results.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+    with export_col2:
+        csv_data = export_to_csv(tasks)
+        st.download_button(
+            label="📥 Export CSV",
+            data=csv_data,
+            file_name="flowmind_tasks.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     # ── PIPELINE VISUALIZATION ───────────────────────
     render_pipeline(orch.agent_list, state.get("current_agent"))
     render_agent_logs(orch.agent_list)
@@ -292,7 +342,7 @@ if st.session_state.pipeline_ran and orch.state.get("pipeline_status") in ("comp
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── AI INSIGHTS & WHAT-IF (PHASE 2) ─────────────
+    # ── AI INSIGHTS & WHAT-IF ─────────────────────
     ins_col1, ins_col2 = st.columns([2, 1])
     
     with ins_col1:
@@ -357,7 +407,7 @@ else:
                 Ready to Orchestrate
             </div>
             <div style="color: #8B8FA3; font-size: 0.9rem; margin-bottom: 1rem;">
-                Select a meeting transcript from the sidebar and click 
+                Select a workflow input from the sidebar or upload a file, then click 
                 <span style="color: #00D4AA; font-weight: 600;">"Run Autonomous Workflow"</span>
                 to activate the multi-agent pipeline.
             </div>
@@ -375,7 +425,7 @@ else:
 
     cols = st.columns(3)
     features = [
-        ("🔍", "Intelligent Extraction", "Parses meeting transcripts to extract action items, decisions, owners, deadlines, and blockers using AI-powered analysis."),
+        ("🔍", "Intelligent Extraction", "Parses input text to extract action items, decisions, owners, deadlines, and blockers using AI-powered analysis."),
         ("🧠", "Risk Intelligence", "Detects missing owners, dependencies, blockers, and overloaded team members with severity-scored risk assessment."),
         ("⚡", "Task Automation", "Converts extracted data into structured executable tasks with priorities, deadlines, and risk flags."),
         ("📊", "Time Simulation", "Simulates task progression across Day 1 → Day 3 with realistic status updates and bottleneck detection."),
@@ -402,8 +452,8 @@ else:
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
             <div style="text-align: center; padding: 0.75rem; background: rgba(0,212,170,0.05); border-radius: 10px; border: 1px solid rgba(0,212,170,0.15);">
                 <div style="font-size: 1.5rem;">1️⃣</div>
-                <div style="font-weight: 600; color: #FAFAFA; margin: 0.3rem 0; font-size: 0.85rem;">Select Transcript</div>
-                <div style="color: #8B8FA3; font-size: 0.72rem;">Choose from 3 realistic enterprise meeting scenarios — Sprint, Q4 Review, or Crisis Response</div>
+                <div style="font-weight: 600; color: #FAFAFA; margin: 0.3rem 0; font-size: 0.85rem;">Provide Input</div>
+                <div style="color: #8B8FA3; font-size: 0.72rem;">Choose a sample workflow, paste your own text, or upload a PDF/TXT file</div>
             </div>
             <div style="text-align: center; padding: 0.75rem; background: rgba(108,99,255,0.05); border-radius: 10px; border: 1px solid rgba(108,99,255,0.15);">
                 <div style="font-size: 1.5rem;">2️⃣</div>
@@ -412,8 +462,8 @@ else:
             </div>
             <div style="text-align: center; padding: 0.75rem; background: rgba(240,147,251,0.05); border-radius: 10px; border: 1px solid rgba(240,147,251,0.15);">
                 <div style="font-size: 1.5rem;">3️⃣</div>
-                <div style="font-weight: 600; color: #FAFAFA; margin: 0.3rem 0; font-size: 0.85rem;">Simulate Days</div>
-                <div style="color: #8B8FA3; font-size: 0.72rem;">Switch between Day 1→3 to see how tasks evolve, delays emerge, and the system auto-responds</div>
+                <div style="font-weight: 600; color: #FAFAFA; margin: 0.3rem 0; font-size: 0.85rem;">Simulate & Export</div>
+                <div style="color: #8B8FA3; font-size: 0.72rem;">Switch between Day 1→3, see autonomous actions, and export results as JSON/CSV</div>
             </div>
         </div>
     </div>

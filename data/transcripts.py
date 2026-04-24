@@ -1,13 +1,13 @@
 """
-Sample Meeting Transcripts for Demo
+Sample Workflow Inputs for FlowMind AI Demo
 
-Three realistic enterprise meeting transcripts:
+Three realistic enterprise scenarios:
 1. Sprint Planning (Simple) — clear tasks, owners, deadlines
 2. Q4 Product Review (With Blockers) — dependencies, blockers, tight deadlines
 3. Crisis Response (Missing Owners) — urgency, missing assignments, conflicting priorities
 """
 
-TRANSCRIPTS = {
+SAMPLE_INPUTS = {
     "Sprint Planning — Simple Meeting": {
         "description": "A clean sprint planning meeting with clear action items, owners, and deadlines.",
         "icon": "📋",
@@ -125,12 +125,23 @@ Raj: Let's flag those and figure it out. We can't let anything fall through the 
     },
 }
 
-
-def get_transcript_names() -> list:
-    """Return list of available transcript names."""
-    return list(TRANSCRIPTS.keys())
+# Backward compatibility alias
+TRANSCRIPTS = SAMPLE_INPUTS
 
 
-def get_transcript(name: str) -> dict:
-    """Get a specific transcript by name."""
-    return TRANSCRIPTS.get(name, {})
+def get_input_names() -> list:
+    """Return list of available input names."""
+    return list(SAMPLE_INPUTS.keys())
+
+
+# Backward compatibility alias
+get_transcript_names = get_input_names
+
+
+def get_input(name: str) -> dict:
+    """Get a specific input by name."""
+    return SAMPLE_INPUTS.get(name, {})
+
+
+# Backward compatibility alias
+get_transcript = get_input

@@ -1,4 +1,4 @@
-"""Agent modules for the Autonomous Meeting Orchestrator."""
+"""Agent modules for FlowMind AI — Autonomous Workflow Orchestrator."""
 
 from agents.base import BaseAgent
 from agents.extraction import ExtractionAgent
